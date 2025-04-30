@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个体值-移动极差 (I-MR) 控制图分析</title>
+    <script src="echarts.min.js"></script>
+    <style>
+        /* CSS styles remain the same */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 0.8rem;
+            font-weight: 600;
+            color: #1a202c;
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            margin-top: 0;
+        }
+
+        h2 {
+            font-size: 1.25rem;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            color: #2d3748;
+        }
+
+        .container-section {
+            background-color: #fff;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            margin-bottom: 1.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .stats-grid div p {
+            margin-bottom: 0.5rem;
+        }
+
+        .stats-grid strong {
+            display: inline-block;
+            min-width: 180px;
+            /* Adjusted min-width */
+            color: #4a5568;
+        }
+
+        .chart-tabs {
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-button {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            background-color: transparent;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #718096;
+            margin-bottom: -2px;
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+
+        .tab-button:hover {
+            color: #2d3748;
+        }
+
+        .tab-button.active {
+            color: #2b6cb0;
+            border-bottom-color: #2b6cb0;
+        }
+
+        .chart-container {
+            width: 100%;
+            /* Increased height slightly for better spacing */
+            height: 380px;
+            margin-bottom: 1rem;
+        }
+
+        .limits-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #f7fafc;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .limits-info p {
+            margin: 0.3rem 0;
+            font-size: 0.9rem;
+        }
+
+        .limits-info strong {
+            display: inline-block;
+            min-width: 150px;
+            /* Adjusted min-width */
+            color: #4a5568;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th,
+        td {
+            border: 1px solid #e2e8f0;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background-color: #f7fafc;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        td:nth-child(3) {
+            /* Value column */
+            font-weight: 500;
+            color: #2d3748;
+        }
+
+        td:nth-child(4) {
+            /* Evaluation column */
+            font-style: italic;
+            color: #718096;
+        }
+
+        .error-message {
+            color: red;
+            font-weight: bold;
+            margin-top: 1rem;
+            background-color: #fff5f5;
+            border: 1px solid #fc8181;
+            padding: 0.8rem;
+            border-radius: 4px;
+        }
+         .stability-summary ul {
+             margin-top: 0.5rem;
+             padding-left: 20px;
+             list-style-type: disc;
+         }
+         .stability-summary li {
+             margin-bottom: 0.3rem;
+         }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>个体值-移动极差 (I-MR) 控制图分析</h1>
+    <div id="error-container" class="error-message hidden"></div>
+
+    <div class="container-section">
+        <h2>基本统计信息</h2>
+        <div class="stats-grid">
+            <div>
+                <p><strong>数据点数量 (k):</strong> <span id="pointCountK"></span></p>
+                <p><strong>个体值平均值 (Ī):</strong> <span id="iBar"></span></p>
+                <p><strong>移动极差平均值 (MR̄):</strong> <span id="mrBar"></span></p>
+            </div>
+            <div>
+                <p><strong>规格上限 (USL):</strong> <span id="usl"></span></p>
+                <p><strong>规格下限 (LSL):</strong> <span id="lsl"></span></p>
+                <p><strong>过程标准差估计 (σ̂ = MR̄/d₂):</strong> <span id="sigmaMRbar"></span></p>
+                <p><strong>整体样本标准差 (s):</strong> <span id="sampleStdDevS"></span></p>
+            </div>
+        </div>
+        <div style="margin-top: 1rem; font-size: 0.9rem; color: #4a5568;">
+            <p><strong>控制图常数 (基于 n=2):</strong> E₂=<span id="constE2"></span>, D₃=<span id="constD3"></span>, D₄=<span
+                    id="constD4"></span>, d₂=<span id="constd2"></span></p>
+        </div>
+    </div>
+
+    <div class="container-section">
+        <div class="chart-tabs">
+            <button id="btn-i" class="tab-button active">个体值 (I) 控制图</button>
+            <button id="btn-mr" class="tab-button">移动极差 (MR) 控制图</button>
+        </div>
+
+        <div id="i-chart-section">
+            <h3>个体值 (I) 控制图</h3>
+            <div id="i-chart-container" class="chart-container"></div>
+            <div class="limits-info">
+                <p><strong>中心线 (CL = Ī):</strong> <span id="iCL"></span></p>
+                <p><strong>上控制限 (UCL = Ī + 3σ̂):</strong> <span id="iUCL"></span></p>
+                <p><strong>下控制限 (LCL = Ī - 3σ̂):</strong> <span id="iLCL"></span></p>
+                 <p><strong>+2σ:</strong> <span id="iUCL2Sigma"></span></p>
+                 <p><strong>+1σ:</strong> <span id="iUCL1Sigma"></span></p>
+                 <p><strong>-1σ:</strong> <span id="iLCL1Sigma"></span></p>
+                 <p><strong>-2σ:</strong> <span id="iLCL2Sigma"></span></p>
+                <p><strong>(规格上限 USL):</strong> <span id="iUSL"></span></p>
+                <p><strong>(规格下限 LSL):</strong> <span id="iLSL"></span></p>
+            </div>
+        </div>
+
+        <div id="mr-chart-section" class="hidden">
+            <h3>移动极差 (MR) 控制图</h3>
+            <div id="mr-chart-container" class="chart-container"></div>
+            <div class="limits-info">
+                <p><strong>中心线 (CL = MR̄):</strong> <span id="mrCL"></span></p>
+                <p><strong>上控制限 (UCL = D₄*MR̄):</strong> <span id="mrUCL"></span></p>
+                <p><strong>下控制限 (LCL = D₃*MR̄):</strong> <span id="mrLCL"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-section">
+        <h2>过程能力 / 性能分析</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>指标</th>
+                    <th>计算标准差来源</th>
+                    <th>值</th>
+                    <th>评价 (基于 Cpk/Ppk ≥ 1.33 优秀)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Cp</td>
+                    <td>σ̂ = MR̄/d₂</td>
+                    <td id="cp-mrbar-val"></td>
+                    <td id="cp-mrbar-eval"></td>
+                </tr>
+                <tr>
+                    <td>Cpk</td>
+                    <td>σ̂ = MR̄/d₂</td>
+                    <td id="cpk-mrbar-val"></td>
+                    <td id="cpk-mrbar-eval"></td>
+                </tr>
+                <tr>
+                    <td>Pp</td>
+                    <td>s (整体样本标准差)</td>
+                    <td id="pp-val"></td>
+                    <td id="pp-eval"></td>
+                </tr>
+                <tr>
+                    <td>Ppk</td>
+                    <td>s (整体样本标准差)</td>
+                    <td id="ppk-val"></td>
+                    <td id="ppk-eval"></td>
+                </tr>
+            </tbody>
+        </table>
+        <div style="margin-top: 1rem; font-size: 0.9rem; color: #4a5568;">
+            <p>说明:</p>
+            <ul>
+                <li>I-MR 图中，过程标准差通常使用基于组内变异 (移动极差平均值) 的估计值 σ̂ = MR̄/d₂ (d₂=1.128)。Cp/Cpk 基于此 σ̂。</li>
+                <li>Pp/Ppk 使用基于所有数据点的整体样本标准差 s，反映过程实际性能。</li>
+                <li>当过程稳定受控时，Cp ≈ Pp 且 Cpk ≈ Ppk。MR̄/d₂ 对异常值更敏感，s 更稳健。</li>
+                <li>评价标准 (如 ≥1.33) 可根据行业或客户要求调整。</li>
+            </ul>
+        </div>
+
+        <h2>过程分析结论</h2>
+         <div id="stability-summary" class="stability-summary" style="background-color: #f7fafc; padding: 1rem; border-radius: 4px; border: 1px solid #e2e8f0;">
+             <p><strong>过程稳定性分析:</strong> <span id="stability-analysis"></span></p>
+             <div id="violations-list"></div>
+             <p style="margin-top: 1rem;"><strong>过程能力分析 (基于 MR̄/d₂):</strong> <span id="capability-analysis-mrbar"></span></p>
+             <p><strong>过程性能分析 (基于 s):</strong> <span id="performance-analysis"></span></p>
+             <p style="margin-top: 1rem;"><strong>控制图解释:</strong> <span id="interpretation"></span></p>
+         </div>
+    </div>
+
+    <script>
+        // --- I-MR 常数 ---
+        const IMR_CONSTANTS = { d2: 1.128, D3: 0, D4: 3.267, E2: 2.660 };
+
+        // --- 数据 (从URL获取) ---
+        let rawData = [];
+        let USL = null;
+        let LSL = null;
+
+        // --- Helper Functions (same as before) ---
+        const formatNum = (num, digits = 6) => (typeof num === 'number' && isFinite(num)) ? num.toFixed(digits) : 'N/A';
+        const formatIndex = (num, digits = 3) => (typeof num === 'number' && isFinite(num)) ? num.toFixed(digits) : 'N/A';
+        const sum = (arr) => arr.filter(n => typeof n === 'number' && isFinite(n)).reduce((a, b) => a + b, 0);
+        const mean = (arr) => { /* ... */
+            const validArr = arr.filter(n => typeof n === 'number' && isFinite(n));
+            return validArr.length === 0 ? NaN : sum(validArr) / validArr.length;
+         }
+        const movingRanges = (arr) => { /* ... */
+            const mrs = [];
+            if (!Array.isArray(arr) || arr.length < 2) return mrs;
+            for (let i = 1; i < arr.length; i++) {
+                if (typeof arr[i] === 'number' && isFinite(arr[i]) && typeof arr[i - 1] === 'number' && isFinite(arr[i - 1])) {
+                    mrs.push(Math.abs(arr[i] - arr[i - 1]));
+                } else {
+                    mrs.push(NaN);
+                }
+            }
+            return mrs;
+        };
+        const sampleStdDev = (arr) => { /* ... */
+            const validArr = arr.filter(n => typeof n === 'number' && isFinite(n));
+            const n = validArr.length;
+            if (n <= 1) return NaN;
+            const m = mean(validArr);
+            if (isNaN(m)) return NaN;
+            const variance = sum(validArr.map(x => Math.pow(x - m, 2))) / (n - 1);
+            return Math.sqrt(variance);
+         };
+        function getEvaluation(value) { /* ... */
+             if (typeof value !== 'number' || !isFinite(value)) return 'N/A';
+             if (value >= 1.33) return '优秀 (≥1.33)';
+             if (value >= 1.0) return '合格 (1.0-1.33)';
+             return '不合格 (<1.0)';
+        }
+        function displayError(message) { /* ... */
+             const errorContainer = document.getElementById('error-container');
+             errorContainer.textContent = message;
+             errorContainer.classList.remove('hidden');
+             document.querySelectorAll('.container-section').forEach(el => el.classList.add('hidden'));
+        }
+
+        // --- 西格玛规则检查 (same as before) ---
+        function checkControlChartRules(data, centerLine, sigma) { /* ... */
+            const violations = {};
+            const n = data.length;
+            const sigma1 = sigma;
+            const sigma2 = 2 * sigma;
+            const sigma3 = 3 * sigma;
+            const ruleDescriptions = {
+                1: "1点超出±3σ控制限 (A区外)",
+                2: "连续9点落在中心线同一侧",
+                3: "连续6点递增或递减",
+                4: "连续14点交互上下波动",
+                5: "连续3点中有2点落在±2σ之外 (A区)",
+                6: "连续5点中有4点落在±1σ之外 (B区)", // Corrected rule 6 definition
+                7: "连续15点落在±1σ之内 (C区)",
+                8: "连续8点落在中心线两侧，但没有点在±1σ内 (C区)"
+            };
+
+            if (n === 0 || !isFinite(centerLine) || !isFinite(sigma) || sigma <= 0) {
+                 return { violations: {}, descriptions: ruleDescriptions };
+            }
+
+             const ucl3Sigma = centerLine + sigma3;
+             const lcl3Sigma = centerLine - sigma3;
+             const ucl2Sigma = centerLine + sigma2;
+             const lcl2Sigma = centerLine - sigma2;
+             const ucl1Sigma = centerLine + sigma1;
+             const lcl1Sigma = centerLine - sigma1;
+
+             // Rule 1
+             const rule1_indices = data.reduce((acc, val, idx) => { if (val > ucl3Sigma || val < lcl3Sigma) acc.push(idx); return acc; }, []);
+             if (rule1_indices.length) violations[1] = rule1_indices;
+             // Rule 2
+             if (n >= 9) { const rule2_indices = new Set(); for (let i = 0; i <= n - 9; i++) { const subset = data.slice(i, i + 9); if (subset.every(val => val > centerLine) || subset.every(val => val < centerLine)) { for (let j = 0; j < 9; j++) rule2_indices.add(i + j); } } if (rule2_indices.size) violations[2] = Array.from(rule2_indices).sort((a, b) => a - b); }
+             // Rule 3
+             if (n >= 6) { const rule3_indices = new Set(); for (let i = 0; i <= n - 6; i++) { const subset = data.slice(i, i + 6); let increasing = true; let decreasing = true; for (let j = 0; j < 5; j++) { if (subset[j+1] <= subset[j]) increasing = false; if (subset[j+1] >= subset[j]) decreasing = false; } if (increasing || decreasing) { for (let j = 0; j < 6; j++) rule3_indices.add(i + j); } } if (rule3_indices.size) violations[3] = Array.from(rule3_indices).sort((a, b) => a - b); }
+             // Rule 4
+             if (n >= 14) { const rule4_indices = new Set(); for (let i = 0; i <= n - 14; i++) { const subset = data.slice(i, i + 14); let alternating = true; for (let j = 0; j < 13; j++) { const diff = subset[j+1] - subset[j]; if (j > 0) { const prevDiff = subset[j] - subset[j-1]; if (diff * prevDiff >= 0) { alternating = false; break; } } else if (diff === 0) { alternating = false; break; } } if (alternating) { for (let j = 0; j < 14; j++) rule4_indices.add(i + j); } } if (rule4_indices.size) violations[4] = Array.from(rule4_indices).sort((a, b) => a - b); }
+             // Rule 5
+             if (n >= 3) { const rule5_indices = new Set(); for (let i = 0; i <= n - 3; i++) { const subset = data.slice(i, i + 3); if (subset.filter(val => val > ucl2Sigma || val < lcl2Sigma).length >= 2) { for (let j = 0; j < 3; j++) rule5_indices.add(i + j); } } if (rule5_indices.size) violations[5] = Array.from(rule5_indices).sort((a, b) => a - b); }
+             // Rule 6
+             if (n >= 5) { const rule6_indices = new Set(); for (let i = 0; i <= n - 5; i++) { const subset = data.slice(i, i + 5); if (subset.filter(val => val > ucl1Sigma).length >= 4 || subset.filter(val => val < lcl1Sigma).length >= 4) { for (let j = 0; j < 5; j++) rule6_indices.add(i + j); } } if (rule6_indices.size) violations[6] = Array.from(rule6_indices).sort((a, b) => a - b); }
+             // Rule 7
+             if (n >= 15) { const rule7_indices = new Set(); for (let i = 0; i <= n - 15; i++) { if (data.slice(i, i + 15).every(val => val < ucl1Sigma && val > lcl1Sigma)) { for (let j = 0; j < 15; j++) rule7_indices.add(i + j); } } if (rule7_indices.size) violations[7] = Array.from(rule7_indices).sort((a, b) => a - b); }
+             // Rule 8
+             if (n >= 8) { const rule8_indices = new Set(); for (let i = 0; i <= n - 8; i++) { if (data.slice(i, i + 8).every(val => val > ucl1Sigma || val < lcl1Sigma)) { for (let j = 0; j < 8; j++) rule8_indices.add(i + j); } } if (rule8_indices.size) violations[8] = Array.from(rule8_indices).sort((a, b) => a - b); }
+
+            return { violations: violations, descriptions: ruleDescriptions };
+        }
+
+        // --- 主计算逻辑 (same as before until ECharts init) ---
+        function calculateAndDisplay() {
+            try {
+                // --- Data Validation, Calculations, HTML Updates (Same as before) ---
+                 if (!Array.isArray(rawData) || rawData.length < 2) throw new Error("无效的输入数据格式或数据点不足。`rawData` 应为至少包含2个数值的一维数组。");
+                 const k = rawData.length;
+                 const validDataPoints = rawData.filter(point => typeof point === 'number' && isFinite(point));
+                 if (validDataPoints.length < 2) throw new Error("有效数值数据点不足 (少于2个)。");
+                 const iValues = validDataPoints;
+                 const actualK = iValues.length;
+                 const { d2, D3, D4, E2 } = IMR_CONSTANTS;
+                 const mrValues = movingRanges(iValues);
+                 const validMrValues = mrValues.filter(mr => typeof mr === 'number' && isFinite(mr));
+                 const iBar = mean(iValues);
+                 const mrBar = mean(validMrValues);
+                 if (isNaN(iBar) || isNaN(mrBar)) throw new Error("无法计算平均值，请检查数据。");
+                 if (mrBar === 0 && actualK > 1) console.warn("移动极差平均值为 0，控制限可能无效。");
+                 const sigmaMRbar = (d2 === 0 || mrBar === 0) ? 0 : mrBar / d2;
+                 const overallStdDevS = sampleStdDev(iValues);
+                 const iCL = iBar;
+                 const iUCL = iBar + 3 * sigmaMRbar;
+                 const iLCL = iBar - 3 * sigmaMRbar;
+                 const iUCL2Sigma = iBar + 2 * sigmaMRbar;
+                 const iLCL2Sigma = iBar - 2 * sigmaMRbar;
+                 const iUCL1Sigma = iBar + 1 * sigmaMRbar;
+                 const iLCL1Sigma = iBar - 1 * sigmaMRbar;
+                 const mrCL = mrBar;
+                 const mrUCL = D4 * mrBar;
+                 const mrLCL = D3 * mrBar;
+                 const sigmaHat_MRbar = sigmaMRbar;
+                 const Cp_MRbar = (sigmaHat_MRbar === 0 || !isFinite(sigmaHat_MRbar) || USL === null || LSL === null) ? NaN : (USL - LSL) / (6 * sigmaHat_MRbar);
+                 const CpU_MRbar = (sigmaHat_MRbar === 0 || !isFinite(sigmaHat_MRbar) || USL === null) ? NaN : (USL - iBar) / (3 * sigmaHat_MRbar);
+                 const CpL_MRbar = (sigmaHat_MRbar === 0 || !isFinite(sigmaHat_MRbar) || LSL === null) ? NaN : (iBar - LSL) / (3 * sigmaHat_MRbar);
+                 const Cpk_MRbar = Math.min(CpU_MRbar, CpL_MRbar);
+                 const Pp = (overallStdDevS === 0 || !isFinite(overallStdDevS) || USL === null || LSL === null) ? NaN : (USL - LSL) / (6 * overallStdDevS);
+                 const PpU = (overallStdDevS === 0 || !isFinite(overallStdDevS) || USL === null) ? NaN : (USL - iBar) / (3 * overallStdDevS);
+                 const PpL = (overallStdDevS === 0 || !isFinite(overallStdDevS) || LSL === null) ? NaN : (iBar - LSL) / (3 * overallStdDevS);
+                 const Ppk = Math.min(PpU, PpL);
+                 document.getElementById('pointCountK').textContent = actualK;
+                 document.getElementById('iBar').textContent = formatNum(iBar);
+                 document.getElementById('mrBar').textContent = formatNum(mrBar);
+                 document.getElementById('sigmaMRbar').textContent = formatNum(sigmaMRbar);
+                 document.getElementById('sampleStdDevS').textContent = formatNum(overallStdDevS);
+                 document.getElementById('usl').textContent = (typeof USL === 'number') ? USL : 'N/A';
+                 document.getElementById('lsl').textContent = (typeof LSL === 'number') ? LSL : 'N/A';
+                 document.getElementById('constE2').textContent = E2;
+                 document.getElementById('constD3').textContent = D3;
+                 document.getElementById('constD4').textContent = D4;
+                 document.getElementById('constd2').textContent = d2;
+                 document.getElementById('iCL').textContent = formatNum(iCL);
+                 document.getElementById('iUCL').textContent = formatNum(iUCL);
+                 document.getElementById('iLCL').textContent = formatNum(iLCL);
+                 document.getElementById('iUCL2Sigma').textContent = formatNum(iUCL2Sigma);
+                 document.getElementById('iLCL2Sigma').textContent = formatNum(iLCL2Sigma);
+                 document.getElementById('iUCL1Sigma').textContent = formatNum(iUCL1Sigma);
+                 document.getElementById('iLCL1Sigma').textContent = formatNum(iLCL1Sigma);
+                 document.getElementById('iUSL').textContent = (typeof USL === 'number') ? formatNum(USL) : 'N/A';
+                 document.getElementById('iLSL').textContent = (typeof LSL === 'number') ? formatNum(LSL) : 'N/A';
+                 document.getElementById('mrCL').textContent = formatNum(mrCL);
+                 document.getElementById('mrUCL').textContent = formatNum(mrUCL);
+                 document.getElementById('mrLCL').textContent = formatNum(mrLCL);
+                 document.getElementById('cp-mrbar-val').textContent = formatIndex(Cp_MRbar);
+                 document.getElementById('cp-mrbar-eval').textContent = getEvaluation(Cp_MRbar);
+                 document.getElementById('cpk-mrbar-val').textContent = formatIndex(Cpk_MRbar);
+                 document.getElementById('cpk-mrbar-eval').textContent = getEvaluation(Cpk_MRbar);
+                 document.getElementById('pp-val').textContent = formatIndex(Pp);
+                 document.getElementById('pp-eval').textContent = getEvaluation(Pp);
+                 document.getElementById('ppk-val').textContent = formatIndex(Ppk);
+                 document.getElementById('ppk-eval').textContent = getEvaluation(Ppk);
+
+                 // --- Rule Checks and Conclusion Update (Same as before) ---
+                 const ruleCheckResult = checkControlChartRules(iValues, iCL, sigmaMRbar);
+                 const violations = ruleCheckResult.violations;
+                 const ruleDescriptions = ruleCheckResult.descriptions;
+                 const iPointsViolatingRulesIndices = [...new Set(Object.values(violations).flat())].sort((a, b) => a - b);
+                 const iPointsOutOfControlCount = iPointsViolatingRulesIndices.length;
+                 const mrPointsOutOfControlIndices = validMrValues.reduce((acc, val, index) => { if (val > mrUCL) acc.push(index); return acc; }, []);
+                 const mrPointsOutOfControlCount = mrPointsOutOfControlIndices.length;
+                 const isIStable = iPointsOutOfControlCount === 0;
+                 const isMRStable = mrPointsOutOfControlCount === 0;
+                 let stableMessage = "";
+                 const violationsListDiv = document.getElementById('violations-list');
+                 violationsListDiv.innerHTML = '';
+                 if (isIStable && isMRStable) { stableMessage = "从 I-MR 控制图看，所有点都在控制限内，且未检测到明显的西格玛规则违例。过程初步判断 <span style='color:green'>统计稳定</span>。"; }
+                 else { /* ... (logic to build unstable message and violations list) ... */
+                    let instabilityCauses = [];
+                     if (mrPointsOutOfControlCount > 0) instabilityCauses.push(`${mrPointsOutOfControlCount}个 MR 点超出上控制限`);
+                     if (iPointsOutOfControlCount > 0) instabilityCauses.push(`I 图中有 ${iPointsOutOfControlCount} 个点违反了西格玛规则`);
+                     stableMessage = `控制图显示过程 <span style='color:red'>可能不稳定</span>: ${instabilityCauses.join(', ')}. 需要进一步调查特殊原因。`;
+                     const violatedRuleNumbers = Object.keys(violations).map(Number).sort((a, b) => a - b);
+                     if (violatedRuleNumbers.length > 0) { const ul = document.createElement('ul'); violatedRuleNumbers.forEach(ruleNum => { const indices = violations[ruleNum]; const displayIndices = indices.map(i => i + 1).join(', '); const li = document.createElement('li'); li.innerHTML = `<strong>规则 ${ruleNum}</strong> (${ruleDescriptions[ruleNum]}): 点 ${displayIndices}`; ul.appendChild(li); }); violationsListDiv.appendChild(ul); }
+                  }
+                 document.getElementById('stability-analysis').innerHTML = stableMessage;
+                 document.getElementById('capability-analysis-mrbar').textContent = `基于 MR̄/d₂ (σ̂=${formatNum(sigmaHat_MRbar, 4)}): Cp=${formatIndex(Cp_MRbar)}, Cpk=${formatIndex(Cpk_MRbar)}. 评价: ${getEvaluation(Cpk_MRbar)}.`;
+                 document.getElementById('performance-analysis').textContent = `基于 s (${formatNum(overallStdDevS, 4)}): Pp=${formatIndex(Pp)}, Ppk=${formatIndex(Ppk)}. 评价: ${getEvaluation(Ppk)}.`;
+                 let interpretationText = `个体值 (I) 图监控过程中心的变化。移动极差 (MR) 图监控过程变异的稳定性。`;
+                  if (!isIStable || !isMRStable) { interpretationText += ` 控制图显示 ${!isIStable ? '过程均值可能不稳定 (I图失控或违反规则)' : ''}${(!isIStable && !isMRStable) ? ' 且 ' : ''}${!isMRStable ? '过程变异不稳定 (MR图失控)' : ''}。`; }
+                  else { interpretationText += ` 两张图均在控制限内且无规则违例，表明过程均值和变异目前是稳定的。`; }
+                  if (typeof Cpk_MRbar === 'number' && isFinite(Cpk_MRbar)) { interpretationText += ` 过程能力指数 Cpk (基于MR̄/d₂) 为 ${formatIndex(Cpk_MRbar)}，${getEvaluation(Cpk_MRbar)}。`; }
+                  else if (USL !== null || LSL !== null) { interpretationText += ` 过程能力指数 Cpk (基于MR̄/d₂) 无法计算 (需要USL和LSL)。`; }
+                  if (typeof Ppk === 'number' && isFinite(Ppk)) { interpretationText += ` 过程性能指数 Ppk (基于s) 为 ${formatIndex(Ppk)}，${getEvaluation(Ppk)}。`; if (isFinite(Cpk_MRbar) && isFinite(Ppk) && Math.abs(Cpk_MRbar - Ppk) > 0.2) { interpretationText += ` Cpk 和 Ppk 差异可能较大 (${formatIndex(Cpk_MRbar)} vs ${formatIndex(Ppk)})，提示可能存在过程偏移或未解释的变异源。`; } }
+                  else if (USL !== null || LSL !== null) { interpretationText += ` 过程性能指数 Ppk (基于s) 无法计算 (需要USL和LSL)。`; }
+                  interpretationText += ` (注意: I-MR图对数据正态性有要求，非正态数据可能导致误判。)`;
+                 document.getElementById('interpretation').textContent = interpretationText;
+
+                // --- ECharts 初始化 ---
+                 const indices = Array.from({ length: actualK }, (_, i) => i + 1);
+                 const paddedMrValues = [NaN, ...mrValues];
+
+                 initializeCharts(
+                    indices, iValues, paddedMrValues,
+                    iCL, iUCL, iLCL, iUCL2Sigma, iLCL2Sigma, iUCL1Sigma, iLCL1Sigma,
+                    mrCL, mrUCL, mrLCL,
+                    USL, LSL, violations
+                );
+
+            } catch (error) { /* ... (same as before) ... */
+                 console.error("计算或显示过程中发生错误:", error);
+                 displayError("错误: " + error.message);
+             }
+        }
+
+
+        // --- Chart Initialization Function (Layout Adjusted & Y-Axis Optimized) ---
+        function initializeCharts(
+            indices, iData, mrData, // indices are [1, 2, ...]
+            iCL, iUCL, iLCL, iUCL2Sigma, iLCL2Sigma, iUCL1Sigma, iLCL1Sigma,
+            mrCL, mrUCL, mrLCL,
+            specUSL, specLSL, violations
+        ) {
+             const iChartElement = document.getElementById('i-chart-container');
+             const mrChartElement = document.getElementById('mr-chart-container');
+             if (!iChartElement || !mrChartElement) { console.error("Chart container elements not found!"); return; }
+             echarts.dispose(iChartElement); echarts.dispose(mrChartElement);
+             const iChart = echarts.init(iChartElement); const mrChart = echarts.init(mrChartElement);
+
+             const commonTooltip = { /* ... (same as before) ... */
+                trigger: 'axis', axisPointer: { type: 'cross' },
+                formatter: function (params) { if (!params || params.length === 0) return ''; let index = params[0].dataIndex; if (index === undefined || index < 0) return ''; let tooltip = `观测点: ${index + 1}<br/>`; if (iData[index] !== undefined && iData[index] !== null) { tooltip += `I: ${formatNum(iData[index])}<br/>`; } if (mrData[index+1] !== undefined && mrData[index+1] !== null) { tooltip += `MR: ${formatNum(mrData[index+1])}<br/>`; } for (const ruleNum in violations) { if (violations[ruleNum].includes(index)) { tooltip += `<span style="color:red;">违反规则 ${ruleNum}</span><br/>`; } } return tooltip; }
+             };
+             const markLineStyle = { symbol: 'none', label: { position: 'end', formatter: '{b}: {c}', fontSize: 10 }, precision: 6, lineStyle: { width: 1.5 } };
+             const markPointStyle = { symbol: 'circle', symbolSize: 10, itemStyle: { color: 'red' }, label: { show: false } };
+
+             function getViolationMarkPoints(data, limitIndices, outOfControlLimits) { /* ... (same as before) ... */
+                const markPoints = [];
+                data.forEach((val, idx) => {
+                    if (typeof val !== 'number' || !isFinite(val)) return;
+                    let isViolation = false;
+                    if (limitIndices && limitIndices.includes(idx)) { isViolation = true; }
+                    else if (outOfControlLimits) { isViolation = (outOfControlLimits.ucl !== undefined && val > outOfControlLimits.ucl) || (outOfControlLimits.lcl !== undefined && val < outOfControlLimits.lcl); }
+                    if (isViolation) { markPoints.push({ name: `Point ${idx + 1}`, coord: [idx, val], value: val, itemStyle: { color: 'red' } }); }
+                });
+                return markPoints;
+             }
+
+             // --- Collect all unique violating points for I chart ---
+             const allViolatingIndices_I = [...new Set(Object.values(violations).flat())].sort((a, b) => a - b);
+             const iMarkPointData = getViolationMarkPoints(iData, allViolatingIndices_I, {ucl: iUCL, lcl: iLCL});
+
+             // --- *** NEW: I Chart Y-axis Scaling Logic *** ---
+             const validIData = iData.filter(d => typeof d === 'number' && isFinite(d));
+             let iMinData = Math.min(...validIData);
+             let iMaxData = Math.max(...validIData);
+             // Define the core range based on data and +/- 2 sigma limits
+             let coreMin = Math.min(iMinData, isFinite(iLCL2Sigma) ? iLCL2Sigma : Infinity);
+             let coreMax = Math.max(iMaxData, isFinite(iUCL2Sigma) ? iUCL2Sigma : -Infinity);
+             // If CL is outside this range, include it too
+             if (isFinite(iCL)) {
+                 coreMin = Math.min(coreMin, iCL);
+                 coreMax = Math.max(coreMax, iCL);
+             }
+             // Handle cases where data has zero range or limits are non-finite
+             if (!isFinite(coreMin) || !isFinite(coreMax)) {
+                 coreMin = isFinite(iMinData) ? iMinData : 0;
+                 coreMax = isFinite(iMaxData) ? iMaxData : 1;
+             }
+             let coreRange = coreMax - coreMin;
+             // If range is very small or zero, set a minimum range
+             if (coreRange <= 1e-6) {
+                 coreRange = Math.max(Math.abs(coreMin * 0.1), 0.01); // Use 10% of value or 0.01
+                 coreMax = coreMin + coreRange; // Recalculate max based on min and range
+             }
+
+             // Calculate buffer: 15% of the core range, with a sensible minimum
+             const iBuffer = Math.max(coreRange * 0.15, 0.005);
+             let iMinY = coreMin - iBuffer;
+             let iMaxY = coreMax + iBuffer;
+
+             // Adjust slightly if Spec Limits are *very close* to the core view,
+             // but AVOID large jumps just to include distant spec limits.
+             const proximityFactor = 0.5; // How close (relative to coreRange) to trigger inclusion
+             if (typeof specUSL === 'number' && isFinite(specUSL) && specUSL > iMaxY && specUSL < (coreMax + coreRange * proximityFactor)) {
+                  iMaxY = specUSL + iBuffer * 0.5; // Expand slightly to include nearby USL
+             }
+             if (typeof specLSL === 'number' && isFinite(specLSL) && specLSL < iMinY && specLSL > (coreMin - coreRange * proximityFactor)) {
+                  iMinY = specLSL - iBuffer * 0.5; // Expand slightly to include nearby LSL
+             }
+             // --- *** End of Y-Axis Scaling Logic *** ---
+
+
+             // --- I Chart Option (Using new Y-axis min/max) ---
+            const iOption = {
+                tooltip: commonTooltip,
+                 grid: { left: '12%', right: '8%', bottom: '15%', top: '10%', containLabel: false },
+                 xAxis: { type: 'category', data: indices, name: '观测点序号', nameLocation: 'middle', nameGap: 35 },
+                 yAxis: {
+                     type: 'value', name: '个体值 (I)', nameLocation: 'middle', nameGap: 70,
+                     // ** Use calculated min/max **
+                     min: formatNum(iMinY, 5),
+                     max: formatNum(iMaxY, 5),
+                     // min/max设置后，scale: true通常可以省略，ECharts会根据min/max计算刻度
+                     // scale: true,
+                     axisLabel: { formatter: (value) => value.toFixed(4) } // Adjust precision if needed
+                 },
+                 series: [{
+                     name: 'I', type: 'line', data: iData, symbolSize: 7, connectNulls: false,
+                     lineStyle: { color: '#2b6cb0', width: 2 }, itemStyle: { color: '#2b6cb0' },
+                     markLine: { silent: true, ...markLineStyle, data: [ // MarkLines will draw even if outside min/max
+                         { yAxis: iCL, name: 'CL', lineStyle: { color: 'blue', type: 'solid', width:1 } },
+                         { yAxis: iUCL, name: 'UCL', lineStyle: { color: 'red', type: 'solid' } },
+                         { yAxis: iLCL, name: 'LCL', lineStyle: { color: 'red', type: 'solid' } },
+                         { yAxis: iUCL2Sigma, name: '+2σ', lineStyle: { color: '#fdba74', type: 'dashed' } },
+                         { yAxis: iLCL2Sigma, name: '-2σ', lineStyle: { color: '#fdba74', type: 'dashed' } },
+                         { yAxis: iUCL1Sigma, name: '+1σ', lineStyle: { color: '#a3e635', type: 'dashed' } },
+                         { yAxis: iLCL1Sigma, name: '-1σ', lineStyle: { color: '#a3e635', type: 'dashed' } },
+                         ...(typeof specUSL === 'number' && isFinite(specUSL)? [{ yAxis: specUSL, name: 'USL', lineStyle: { color: 'green', type: 'dashed' } }] : []),
+                         ...(typeof specLSL === 'number' && isFinite(specLSL)? [{ yAxis: specLSL, name: 'LSL', lineStyle: { color: 'green', type: 'dashed' } }] : [])
+                     ] },
+                     markPoint: { ...markPointStyle, data: iMarkPointData }
+                 }],
+                 dataZoom: [{ type: 'inside', start: 0, end: 100 }, { type: 'slider', height: 20, bottom: 10 }]
+             };
+
+             // --- MR Chart Y-axis Scaling (Small adjustment) ---
+             const validMrData = mrData.filter(d => typeof d === 'number' && isFinite(d));
+             const mrDataMin = Math.min(0, ...validMrData);
+             const mrDataMax = Math.max(...validMrData, isFinite(mrUCL) ? mrUCL : -Infinity);
+             const mrRange = mrDataMax - mrDataMin;
+             const mrBuffer = Math.max(mrRange * 0.15, 0.005); // Similar buffer logic
+             const mrMinY = Math.max(0, mrDataMin - mrBuffer); // Ensure non-negative Y
+             let mrMaxY = mrDataMax + mrBuffer;
+             if (!isFinite(mrMinY) || !isFinite(mrMaxY)) { mrMinY = 0; mrMaxY = mrDataMax + 0.1; }
+
+             // --- Mark points for MR chart ---
+             const mrMarkPointData = getViolationMarkPoints(mrData, null, { ucl: mrUCL, lcl: -Infinity });
+
+             // --- MR Chart Option (Using adjusted Y-axis) ---
+             const mrOption = {
+                tooltip: commonTooltip,
+                 grid: { left: '12%', right: '8%', bottom: '15%', top: '10%', containLabel: false },
+                 xAxis: { type: 'category', data: indices, name: '观测点序号', nameLocation: 'middle', nameGap: 35 },
+                 yAxis: {
+                     type: 'value', name: '移动极差 (MR)', nameLocation: 'middle', nameGap: 55,
+                     // ** Use calculated min/max **
+                     min: formatNum(mrMinY, 5),
+                     max: formatNum(mrMaxY, 5),
+                     // scale: true, // Usually okay for MR chart, but consistent to remove if min/max set
+                     axisLabel: { formatter: (value) => value.toFixed(4) }
+                 },
+                 series: [{
+                     name: 'MR', type: 'line', data: mrData.slice(1),
+                     symbolSize: 7, connectNulls: false,
+                     lineStyle: { color: '#38a169', width: 2 }, itemStyle: { color: '#38a169' },
+                     markLine: { silent: true, ...markLineStyle, data: [
+                         { yAxis: mrCL, name: 'CL', lineStyle: { color: 'blue', type: 'solid', width: 1 } },
+                         { yAxis: mrUCL, name: 'UCL', lineStyle: { color: 'red', type: 'solid' } },
+                         ...(mrLCL > 0 ? [{ yAxis: mrLCL, name: 'LCL', lineStyle: { color: 'red', type: 'solid' } }] : [])
+                     ] },
+                     markPoint: { ...markPointStyle, data: mrMarkPointData }
+                 }],
+                 dataZoom: [{ type: 'inside', start: 0, end: 100 }, { type: 'slider', height: 20, bottom: 10 }]
+             };
+
+
+            iChart.setOption(iOption, true);
+            mrChart.setOption(mrOption, true);
+            echarts.connect([iChart, mrChart]);
+            window.currentCharts = { i: iChart, mr: mrChart };
+        }
+
+        // --- Tab 切换和窗口大小调整 (same as before) ---
+        document.addEventListener('DOMContentLoaded', (event) => { /* ... */
+             const urlParams = new URLSearchParams(window.location.search);
+             const dataParam = urlParams.get('data');
+             const uslParam = urlParams.get('usl');
+             const lslParam = urlParams.get('lsl');
+              try {
+                  if (dataParam) rawData = JSON.parse(decodeURIComponent(dataParam));
+                  else throw new Error("URL中未找到数据参数。");
+                  if (uslParam && uslParam !== 'null') USL = parseFloat(decodeURIComponent(uslParam));
+                  else USL = null;
+                  if (lslParam && lslParam !== 'null') LSL = parseFloat(decodeURIComponent(lslParam));
+                  else LSL = null;
+                  if (isNaN(USL)) USL = null;
+                  if (isNaN(LSL)) LSL = null;
+                  calculateAndDisplay();
+              } catch (error) {
+                  console.error("无法从URL参数加载或解析数据:", error);
+                  displayError("错误: 无法加载或解析数据 - " + error.message);
+                  return;
+              }
+              const btnI = document.getElementById('btn-i');
+              const btnMR = document.getElementById('btn-mr');
+              const iSection = document.getElementById('i-chart-section');
+              const mrSection = document.getElementById('mr-chart-section');
+              if (btnI && btnMR && iSection && mrSection) {
+                  btnI.addEventListener('click', () => {
+                      iSection.classList.remove('hidden'); mrSection.classList.add('hidden');
+                      btnI.classList.add('active'); btnMR.classList.remove('active');
+                      if (window.currentCharts?.i) setTimeout(() => window.currentCharts.i.resize(), 50);
+                  });
+                  btnMR.addEventListener('click', () => {
+                      iSection.classList.add('hidden'); mrSection.classList.remove('hidden');
+                      btnI.classList.remove('active'); btnMR.classList.add('active');
+                      if (window.currentCharts?.mr) setTimeout(() => window.currentCharts.mr.resize(), 50);
+                  });
+              } else { console.error("Tab button or section elements not found!"); }
+              window.addEventListener('resize', () => {
+                  if (window.currentCharts?.i && !iSection.classList.contains('hidden')) window.currentCharts.i.resize();
+                  if (window.currentCharts?.mr && !mrSection.classList.contains('hidden')) window.currentCharts.mr.resize();
+              });
+         });
+
+    </script>
+
+</body>
+</html>

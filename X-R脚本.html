@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-R 控制图分析 (可变n值优化版)</title>
+    <script src="echarts.min.js"></script>
+    <style>
+        /* CSS styles remain the same as in the original file */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        h1, h2, h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 0.8rem;
+            font-weight: 600;
+            color: #1a202c;
+        }
+        h1 { font-size: 1.75rem; margin-top: 0; } /* text-3xl */
+        h2 { font-size: 1.25rem; } /* text-xl */
+        h3 { font-size: 1.1rem; color: #2d3748; } /* text-lg */
+
+        .container-section {
+            background-color: #fff;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            margin-bottom: 1.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Responsive grid */
+            gap: 1.5rem;
+        }
+        .stats-grid div p {
+             margin-bottom: 0.5rem;
+        }
+        .stats-grid strong {
+            display: inline-block;
+            min-width: 160px; /* Align values */
+            color: #4a5568;
+        }
+
+        .chart-tabs {
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 1.5rem;
+        }
+        .tab-button {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            background-color: transparent;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #718096;
+            margin-bottom: -2px; /* Overlap border */
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .tab-button:hover {
+            color: #2d3748;
+        }
+        .tab-button.active {
+            color: #2b6cb0; /* Blue color */
+            border-bottom-color: #2b6cb0;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 350px; /* Increased height */
+            margin-bottom: 1rem;
+        }
+        .limits-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #f7fafc;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+        .limits-info p {
+            margin: 0.3rem 0;
+            font-size: 0.9rem;
+        }
+        .limits-info strong {
+            display: inline-block;
+            min-width: 100px; /* Align values */
+            color: #4a5568;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+            overflow: hidden; /* Ensures border-radius applies to table */
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 0.75rem 1rem; /* Increased padding */
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        th {
+            background-color: #f7fafc;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        td:nth-child(2) { /* Value column */
+             font-weight: 500;
+             color: #2d3748;
+        }
+         td:nth-child(3) { /* Evaluation column */
+             font-style: italic;
+             color: #718096;
+         }
+        .error-message {
+            color: red;
+            font-weight: bold;
+            margin-top: 1rem;
+            background-color: #fff5f5;
+            border: 1px solid #fc8181;
+            padding: 0.8rem;
+            border-radius: 4px;
+        }
+        /* Utility class to hide elements */
+        .hidden {
+            display: none !important; /* Use !important to ensure override */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>X-R 控制图分析 JOEY-0428 </h1>
+    <div id="error-container" class="error-message hidden"></div> <div class="container-section">
+        <h2>基本统计信息</h2>
+        <div class="stats-grid">
+            <div>
+                <p><strong>子组大小 (n):</strong> <span id="subgroupSizeN"></span></p>
+                <p><strong>子组数量 (k):</strong> <span id="subgroupCountK"></span></p>
+                <p><strong>X均值的平均值 (X̿):</strong> <span id="xbarBar"></span></p>
+                <p><strong>R平均值 (R̄):</strong> <span id="rBar"></span></p>
+
+            </div>
+            <div>
+                <p><strong>规格上限 (USL):</strong> <span id="usl"></span></p>
+                <p><strong>规格下限 (LSL):</strong> <span id="lsl"></span></p>
+                <p><strong>过程标准差估计 (σ̂ = R̄/d₂):</strong> <span id="sigmaRbar"></span></p>
+                 <p><strong>整体样本标准差 (s):</strong> <span id="sampleStdDevS"></span></p>
+                <p><strong>过程标准差估计 (σ̂ = s/c₄):</strong> <span id="sigmaS"></span></p>
+            </div>
+        </div>
+         <div style="margin-top: 1rem; font-size: 0.9rem; color: #4a5568;">
+            <p><strong>控制图常数:</strong> A₂=<span id="constA2"></span>, D₃=<span id="constD3"></span>, D₄=<span id="constD4"></span>, d₂=<span id="constd2"></span>, c₄=<span id="constc4"></span></p>
+        </div>
+    </div>
+
+    <div class="container-section">
+        <div class="chart-tabs">
+            <button id="btn-xbar" class="tab-button active">X均值控制图</button>
+            <button id="btn-r" class="tab-button">R控制图</button>
+        </div>
+
+        <div id="xbar-chart-section">
+            <h3>X均值控制图 (基于 R̄)</h3>
+            <div id="xbar-chart-container" class="chart-container"></div>
+            <div class="limits-info">
+                <p><strong>中心线 (CL = X̿):</strong> <span id="xbarCL"></span></p>
+                <p><strong>上控制限 (UCL = X̿ + A₂R̄):</strong> <span id="xbarUCL"></span></p>
+                <p><strong>下控制限 (LCL = X̿ - A₂R̄):</strong> <span id="xbarLCL"></span></p>
+            </div>
+        </div>
+
+        <div id="r-chart-section" class="hidden">
+            <h3>R控制图</h3>
+            <div id="r-chart-container" class="chart-container"></div>
+            <div class="limits-info">
+                <p><strong>中心线 (CL = R̄):</strong> <span id="rCL"></span></p>
+                <p><strong>上控制限 (UCL = D₄R̄):</strong> <span id="rUCL"></span></p>
+                <p><strong>下控制限 (LCL = D₃R̄):</strong> <span id="rLCL"></span></p>
+            </div>
+        </div>
+     </div>
+
+    <div class="container-section">
+        <h2>过程能力 / 性能分析</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>指标</th>
+                    <th>计算标准差来源</th>
+                    <th>值</th>
+                    <th>评价</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Cp</td>
+                    <td>σ̂ = R̄/d₂</td>
+                    <td id="cp-rbar-val"></td>
+                    <td id="cp-rbar-eval"></td>
+                </tr>
+                <tr>
+                    <td>Cpk</td>
+                    <td>σ̂ = R̄/d₂</td>
+                    <td id="cpk-rbar-val"></td>
+                    <td id="cpk-rbar-eval"></td>
+                </tr>
+                 <tr>
+                    <td>Pp</td>
+                     <td>s (整体样本标准差)</td>
+                    <td id="pp-val"></td>
+                    <td id="pp-eval"></td>
+                </tr>
+                <tr>
+                    <td>Ppk</td>
+                     <td>s (整体样本标准差)</td>
+                    <td id="ppk-val"></td>
+                    <td id="ppk-eval"></td>
+                </tr>
+                 <tr>
+                    <td>Cp (基于s)</td>
+                    <td>σ̂ = s/c₄</td>
+                    <td id="cp-s-val"></td>
+                    <td id="cp-s-eval"></td>
+                </tr>
+                <tr>
+                    <td>Cpk (基于s)</td>
+                    <td>σ̂ = s/c₄</td>
+                    <td id="cpk-s-val"></td>
+                    <td id="cpk-s-eval"></td>
+                </tr>
+            </tbody>
+        </table>
+        <div style="margin-top: 1rem; font-size: 0.9rem; color: #4a5568;">
+            <p>说明:</p>
+            <ul>
+                <li>Cp/Cpk 通常使用基于组内变异 (R̄/d₂ 或 s/c₄) 估计的 σ̂，反映过程固有能力。</li>
+                <li>Pp/Ppk 使用基于所有数据点的整体样本标准差 s，反映过程实际性能，包含组间和组内变异。</li>
+                <li>当过程稳定受控时，Cp ≈ Pp 且 Cpk ≈ Ppk。</li>
+                 <li>使用 R̄/d₂ 估计 σ̂ 对数据正态性更敏感；s/c₄ 更稳健但假设组内变异恒定。</li>
+            </ul>
+        </div>
+
+        <h2>过程分析结论</h2>
+        <div style="background-color: #f7fafc; padding: 1rem; border-radius: 4px; border: 1px solid #e2e8f0;">
+            <p><strong>过程稳定性分析:</strong> <span id="stability-analysis"></span></p>
+            <p><strong>过程能力分析 (基于 R̄/d₂):</strong> <span id="capability-analysis-rbar"></span></p>
+            <p><strong>过程能力分析 (基于 s/c₄):</strong> <span id="capability-analysis-s"></span></p>
+            <p><strong>过程性能分析 (基于 s):</strong> <span id="performance-analysis"></span></p>
+        </div>
+    </div>
+
+    <script>
+        // --- 控制图常数表 ---
+        // Key: n (subgroup size)
+        // Values: { A2, D3, D4, d2, c4 }
+        const CONTROL_CHART_CONSTANTS = {
+             2: { A2: 1.880, D3: 0, D4: 3.267, d2: 1.128, c4: 0.7979 },
+             3: { A2: 1.023, D3: 0, D4: 2.574, d2: 1.693, c4: 0.8862 },
+             4: { A2: 0.729, D3: 0, D4: 2.282, d2: 2.059, c4: 0.9213 },
+             5: { A2: 0.577, D3: 0, D4: 2.114, d2: 2.326, c4: 0.9400 },
+             6: { A2: 0.483, D3: 0, D4: 2.004, d2: 2.534, c4: 0.9515 },
+             7: { A2: 0.419, D3: 0.076, D4: 1.924, d2: 2.704, c4: 0.9594 },
+             8: { A2: 0.373, D3: 0.136, D4: 1.864, d2: 2.847, c4: 0.9650 },
+             9: { A2: 0.337, D3: 0.184, D4: 1.816, d2: 2.970, c4: 0.9693 },
+            10: { A2: 0.308, D3: 0.223, D4: 1.777, d2: 3.078, c4: 0.9727 }
+            // Add more constants if needed for larger n
+        };
+
+        // --- 数据输入 ---
+        // 结构: k 组 n 个采样数据
+        // 例: 25组，每组5个样本 (k=25, n=5)
+        const rawData = [
+            [16.982,16.982,16.982,16.982,16.982], // Subgroup 1
+            [16.983,16.982,16.982,16.981,16.982], // Subgroup 2
+            [16.983,16.981,16.981,16.983,16.982], // Subgroup 3
+            [16.983,16.981,16.982,16.982,16.982], // Subgroup 4
+            [16.982,16.983,16.982,16.981,16.982], // Subgroup 5
+            [16.982,16.982,16.982,16.983,16.981], // Subgroup 6
+            [16.983,16.981,16.982,16.981,16.982], // Subgroup 7
+            [16.982,16.983,16.981,16.982,16.981], // Subgroup 8
+            [16.983,16.981,16.982,16.983,16.983], // Subgroup 9
+            [16.982,16.981,16.982,16.981,16.982], // Subgroup 10
+            [16.982,16.981,16.981,16.982,16.982], // Subgroup 11
+            [16.982,16.983,16.982,16.982,16.982], // Subgroup 12
+            [16.981,16.983,16.982,16.983,16.981], // Subgroup 13
+            [16.983,16.982,16.982,16.982,16.982], // Subgroup 14
+            [16.982,16.982,16.982,16.981,16.982], // Subgroup 15
+            [16.982,16.982,16.983,16.983,16.982], // Subgroup 16
+            [16.982,16.983,16.982,16.982,16.981], // Subgroup 17
+            [16.982,16.983,16.983,16.983,16.982], // Subgroup 18
+            [16.982,16.983,16.982,16.982,16.982], // Subgroup 19
+            [16.982,16.981,16.982,16.981,16.982], // Subgroup 20
+            [16.981,16.981,16.983,16.983,16.982], // Subgroup 21
+            [16.981,16.981,16.982,16.981,16.982], // Subgroup 22
+            [16.982,16.983,16.981,16.981,16.982], // Subgroup 23
+            [16.983,16.981,16.982,16.982,16.981], // Subgroup 24
+            [16.982,16.981,16.981,16.981,16.983] // Subgroup 25
+        ];
+
+        // --- 规格限 ---
+        const USL = 16.986;
+        const LSL = 16.973;
+
+        // --- Helper Functions ---
+        const formatNum = (num, digits = 6) => (typeof num === 'number' && isFinite(num)) ? num.toFixed(digits) : 'N/A';
+        const formatIndex = (num, digits = 3) => (typeof num === 'number' && isFinite(num)) ? num.toFixed(digits) : 'N/A';
+        const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+        const mean = (arr) => arr.length === 0 ? 0 : sum(arr) / arr.length;
+        const range = (arr) => arr.length === 0 ? 0 : Math.max(...arr) - Math.min(...arr);
+        // Sample Standard Deviation (Bessel's correction)
+        const sampleStdDev = (arr) => {
+            const n = arr.length;
+            if (n <= 1) return 0;
+            const m = mean(arr);
+            const variance = sum(arr.map(x => Math.pow(x - m, 2))) / (n - 1);
+            return Math.sqrt(variance);
+        };
+
+        function getEvaluation(value) {
+            if (typeof value !== 'number' || !isFinite(value)) return 'N/A';
+            if (value >= 1.33) return '优秀 (≥1.33)';
+            if (value >= 1.0) return '合格 (1.0-1.33)';
+            return '不合格 (<1.0)';
+        }
+
+        function displayError(message) {
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.textContent = message;
+            errorContainer.classList.remove('hidden');
+            // Optionally hide main content sections if error is critical
+        }
+
+        // --- 主计算逻辑 ---
+        function calculateAndDisplay() {
+            try {
+                 // --- 数据验证 ---
+                if (!Array.isArray(rawData) || rawData.length === 0 || !Array.isArray(rawData[0])) {
+                    throw new Error("无效的输入数据格式。`rawData` 应为非空二维数组。");
+                }
+                const k = rawData.length; // 子组数量
+                const n = rawData[0].length; // 子组大小 (从第一个子组获取)
+                if (n < 2) {
+                     throw new Error("子组大小 (n) 必须至少为 2。");
+                }
+                // 检查所有子组大小是否一致
+                if (!rawData.every(subgroup => Array.isArray(subgroup) && subgroup.length === n)) {
+                    throw new Error("所有子组的大小必须相同。");
+                }
+                 // 检查数据是否都是数字
+                 const allDataPoints = rawData.flat();
+                 if (!allDataPoints.every(point => typeof point === 'number' && isFinite(point))) {
+                     throw new Error("输入数据必须包含有效的数字。");
+                 }
+
+                // --- 获取控制图常数 ---
+                const constants = CONTROL_CHART_CONSTANTS[n];
+                if (!constants) {
+                    throw new Error(`未找到子组大小 n=${n} 的控制图常数。请更新 CONTROL_CHART_CONSTANTS 表。`);
+                }
+                const { A2, D3, D4, d2, c4 } = constants;
+
+                // --- 计算子组统计量 ---
+                const xbarValues = rawData.map(subgroup => mean(subgroup));
+                const rValues = rawData.map(subgroup => range(subgroup));
+                const subgroupIndices = xbarValues.map((_, index) => index + 1);
+
+                // --- 计算整体统计量 ---
+                const xbarBar = mean(xbarValues); // X̿
+                const rBar = mean(rValues);       // R̄
+
+                // --- 标准差估计 ---
+                // 1. 基于 R̄/d₂
+                const sigmaRbar = (d2 === 0) ? Infinity : rBar / d2;
+                 // 2. 基于整体样本标准差 s (使用所有数据点)
+                const overallMean = mean(allDataPoints);
+                const overallVariance = sum(allDataPoints.map(x => Math.pow(x - overallMean, 2))) / (allDataPoints.length - 1);
+                const overallStdDevS = Math.sqrt(overallVariance); // s
+                // 3. 基于 s/c₄
+                 const sigmaS = (c4 === 0) ? Infinity : overallStdDevS / c4;
+
+
+                // --- 控制限计算 ---
+                const xUCL = xbarBar + A2 * rBar;
+                const xLCL = xbarBar - A2 * rBar;
+                const rUCL = D4 * rBar;
+                const rLCL = D3 * rBar;
+
+                // --- 过程能力 (基于 Rbar/d2) ---
+                const sigmaHat_Rbar = sigmaRbar;
+                const Cp_Rbar = (sigmaHat_Rbar === 0 || !isFinite(sigmaHat_Rbar)) ? Infinity : (USL - LSL) / (6 * sigmaHat_Rbar);
+                const CpU_Rbar = (sigmaHat_Rbar === 0 || !isFinite(sigmaHat_Rbar)) ? Infinity : (USL - xbarBar) / (3 * sigmaHat_Rbar);
+                const CpL_Rbar = (sigmaHat_Rbar === 0 || !isFinite(sigmaHat_Rbar)) ? Infinity : (xbarBar - LSL) / (3 * sigmaHat_Rbar);
+                const Cpk_Rbar = Math.min(CpU_Rbar, CpL_Rbar);
+
+                // --- 过程能力 (基于 s/c4) ---
+                 const sigmaHat_S = sigmaS;
+                 const Cp_S = (sigmaHat_S === 0 || !isFinite(sigmaHat_S)) ? Infinity : (USL - LSL) / (6 * sigmaHat_S);
+                 const CpU_S = (sigmaHat_S === 0 || !isFinite(sigmaHat_S)) ? Infinity : (USL - xbarBar) / (3 * sigmaHat_S);
+                 const CpL_S = (sigmaHat_S === 0 || !isFinite(sigmaHat_S)) ? Infinity : (xbarBar - LSL) / (3 * sigmaHat_S);
+                 const Cpk_S = Math.min(CpU_S, CpL_S);
+
+                // --- 过程性能 (基于整体样本标准差 s) ---
+                const Pp = (overallStdDevS === 0 || !isFinite(overallStdDevS)) ? Infinity : (USL - LSL) / (6 * overallStdDevS);
+                const PpU = (overallStdDevS === 0 || !isFinite(overallStdDevS)) ? Infinity : (USL - xbarBar) / (3 * overallStdDevS); // Use xbarBar (overall mean) for Pp/Ppk
+                const PpL = (overallStdDevS === 0 || !isFinite(overallStdDevS)) ? Infinity : (xbarBar - LSL) / (3 * overallStdDevS);
+                const Ppk = Math.min(PpU, PpL);
+
+
+                // --- 更新HTML显示统计信息 ---
+                document.getElementById('subgroupSizeN').textContent = n;
+                document.getElementById('subgroupCountK').textContent = k;
+                document.getElementById('xbarBar').textContent = formatNum(xbarBar);
+                document.getElementById('rBar').textContent = formatNum(rBar);
+                document.getElementById('sigmaRbar').textContent = formatNum(sigmaHat_Rbar);
+                document.getElementById('sampleStdDevS').textContent = formatNum(overallStdDevS);
+                 document.getElementById('sigmaS').textContent = formatNum(sigmaHat_S);
+                document.getElementById('usl').textContent = USL;
+                document.getElementById('lsl').textContent = LSL;
+
+                // Update constants display
+                document.getElementById('constA2').textContent = A2;
+                document.getElementById('constD3').textContent = D3;
+                document.getElementById('constD4').textContent = D4;
+                document.getElementById('constd2').textContent = d2;
+                document.getElementById('constc4').textContent = c4;
+
+
+                // Update control limit info displays
+                document.getElementById('xbarCL').textContent = formatNum(xbarBar);
+                document.getElementById('xbarUCL').textContent = formatNum(xUCL);
+                document.getElementById('xbarLCL').textContent = formatNum(xLCL);
+                document.getElementById('rCL').textContent = formatNum(rBar);
+                document.getElementById('rUCL').textContent = formatNum(rUCL);
+                document.getElementById('rLCL').textContent = formatNum(rLCL);
+
+                // --- 更新过程能力/性能表格 ---
+                document.getElementById('cp-rbar-val').textContent = formatIndex(Cp_Rbar);
+                document.getElementById('cp-rbar-eval').textContent = getEvaluation(Cp_Rbar);
+                document.getElementById('cpk-rbar-val').textContent = formatIndex(Cpk_Rbar);
+                document.getElementById('cpk-rbar-eval').textContent = getEvaluation(Cpk_Rbar);
+                 document.getElementById('cp-s-val').textContent = formatIndex(Cp_S);
+                document.getElementById('cp-s-eval').textContent = getEvaluation(Cp_S);
+                document.getElementById('cpk-s-val').textContent = formatIndex(Cpk_S);
+                document.getElementById('cpk-s-eval').textContent = getEvaluation(Cpk_S);
+                document.getElementById('pp-val').textContent = formatIndex(Pp);
+                document.getElementById('pp-eval').textContent = getEvaluation(Pp);
+                document.getElementById('ppk-val').textContent = formatIndex(Ppk);
+                document.getElementById('ppk-eval').textContent = getEvaluation(Ppk);
+
+                // --- 更新结论文本 ---
+                let xPointsOutOfControl = xbarValues.filter(val => val < xLCL || val > xUCL).length;
+                let rPointsOutOfControl = rValues.filter(val => val < rLCL || val > rUCL).length;
+                let isXbarStable = xPointsOutOfControl === 0;
+                let isRStable = rPointsOutOfControl === 0;
+                 // Basic Run Test (e.g., 8 points in a row on one side of CL) - Simplified check
+                let xRuns = checkRuns(xbarValues, xbarBar);
+                let rRuns = checkRuns(rValues, rBar);
+                let stableMessage = "";
+                if (isXbarStable && isRStable && !xRuns && !rRuns) {
+                     stableMessage = "从X-R控制图看，所有点都在控制限内，且未检测到明显的运行规则违例（如长连串在中心线一侧）。过程初步判断稳定受控。";
+                } else {
+                     stableMessage = `控制图显示过程可能不稳定: ${xPointsOutOfControl}个Xbar点超出控制限, ${rPointsOutOfControl}个R点超出控制限. ${xRuns ? 'Xbar图存在长连串。': ''} ${rRuns ? 'R图存在长连串。': ''} 需要进一步调查。`;
+                }
+                document.getElementById('stability-analysis').textContent = stableMessage;
+
+                 document.getElementById('capability-analysis-rbar').textContent = `基于 R̄/d₂ (σ̂=${formatNum(sigmaHat_Rbar,4)}): Cp=${formatIndex(Cp_Rbar)}, Cpk=${formatIndex(Cpk_Rbar)}. ${getEvaluation(Cpk_Rbar)}.`;
+                 document.getElementById('capability-analysis-s').textContent = `基于 s/c₄ (σ̂=${formatNum(sigmaHat_S,4)}): Cp=${formatIndex(Cp_S)}, Cpk=${formatIndex(Cpk_S)}. ${getEvaluation(Cpk_S)}.`;
+                document.getElementById('performance-analysis').textContent = `基于 s (${formatNum(overallStdDevS,4)}): Pp=${formatIndex(Pp)}, Ppk=${formatIndex(Ppk)}. ${getEvaluation(Ppk)}.`;
+
+
+                 // --- ECharts 初始化和配置 ---
+                initializeCharts(subgroupIndices, xbarValues, rValues, xbarBar, xUCL, xLCL, rBar, rUCL, rLCL, USL, LSL);
+
+            } catch (error) {
+                console.error("计算或显示过程中发生错误:", error);
+                displayError("错误: " + error.message);
+                // Optionally clear charts or previous results here
+            }
+        }
+
+         // Simple run test helper: checks for 8 or more points consecutively on one side of the center line
+         function checkRuns(data, centerLine) {
+             let count = 0;
+             let side = 0; // 0: center, 1: above, -1: below
+             for (const point of data) {
+                 let currentSide = Math.sign(point - centerLine);
+                 if (currentSide === 0) { // Reset if point is on the line
+                     count = 0;
+                     side = 0;
+                 } else if (currentSide === side) {
+                     count++;
+                 } else { // Switched side
+                     side = currentSide;
+                     count = 1;
+                 }
+                 if (count >= 8) return true; // Found a run of 8 or more
+             }
+             return false; // No run of 8 or more found
+         }
+
+
+// --- Chart Initialization Function (Optimized Y-axis Scaling) ---
+function initializeCharts(indices, xData, rData, xCL, xUCL, xLCL, rCL, rUCL, rLCL, specUSL, specLSL) {
+             const xbarChartElement = document.getElementById('xbar-chart-container');
+             const rChartElement = document.getElementById('r-chart-container');
+
+             if (!xbarChartElement || !rChartElement) {
+                 console.error("Chart container elements not found!");
+                 return;
+             }
+
+             // Dispose existing charts if they exist to prevent memory leaks on re-run
+             echarts.dispose(xbarChartElement);
+             echarts.dispose(rChartElement);
+
+             const xbarChart = echarts.init(xbarChartElement);
+             const rChart = echarts.init(rChartElement);
+
+             const commonTooltip = {
+                trigger: 'axis',
+                axisPointer: { type: 'cross' },
+                formatter: function (params) {
+                    let index = params[0].dataIndex ?? (parseInt(params[0].name) - 1);
+                    let tooltip = `子组: ${index + 1}<br/>`;
+                    if (params[0].seriesName === 'X-bar' && xData[index] !== undefined) {
+                        tooltip += `X-bar: ${formatNum(xData[index])}<br/>`;
+                        // Optional: Show raw data for the subgroup
+                        // if (window.rawData && window.rawData[index]) { // Assuming rawData is accessible globally or passed
+                        //     tooltip += `原始数据: ${window.rawData[index].map(d => formatNum(d, 4)).join(', ')}<br/>`;
+                        // }
+                    }
+                    if (params[0].seriesName === 'R' && rData[index] !== undefined) {
+                         tooltip += `R: ${formatNum(rData[index])}<br/>`;
+                    }
+                    return tooltip;
+                }
+             };
+
+             const markLineStyle = {
+                 symbol: 'none',
+                 label: { position: 'end', formatter: '{b}: {c}', fontSize: 10 },
+                 precision: 6, // Decimal places for limit labels
+                 lineStyle: {
+                     width: 1.5 // Make limit lines slightly thicker if desired
+                 }
+             };
+
+            // --- X-bar Chart Y-axis Scaling Logic ---
+            const xDataMin = Math.min(...xData);
+            const xDataMax = Math.max(...xData);
+
+            // 1. Determine the core vertical range: data points and control limits
+            const coreMin = Math.min(xDataMin, xLCL);
+            const coreMax = Math.max(xDataMax, xUCL);
+            const coreRange = coreMax - coreMin;
+
+            // 2. Calculate buffer: Proportional to core range, with a minimum absolute value
+            //    (Adjust multiplier 0.2 (20%) or minAbsoluteBuffer 0.0001 if needed)
+            const relativeBuffer = coreRange * 0.20;
+            const minAbsoluteBuffer = Math.abs(coreRange * 0.1) < 0.00001 ? 0.0001 : Math.abs(coreRange * 0.1); // Dynamic min buffer based on range, or fixed small value
+            const buffer = Math.max(relativeBuffer, minAbsoluteBuffer);
+
+            // 3. Set initial Y-axis min/max based on core range + buffer
+            let yMin = coreMin - buffer;
+            let yMax = coreMax + buffer;
+
+             // 4. Handle potential division by zero or NaN if coreRange is 0
+             if (!isFinite(yMin) || !isFinite(yMax)) {
+                 yMin = coreMin - 0.0005; // Fallback small fixed buffer
+                 yMax = coreMax + 0.0005;
+             }
+
+             // 5. Adjust slightly if Spec Limits are *very close* to the core view,
+            //    but AVOID large jumps just to include distant spec limits.
+            const proximityFactor = 0.5; // How close (relative to coreRange) to trigger inclusion
+            if (typeof specUSL === 'number' && specUSL > yMax && specUSL < (coreMax + coreRange * proximityFactor)) {
+                 yMax = specUSL + buffer * 0.5; // Expand slightly to include nearby USL
+            }
+            if (typeof specLSL === 'number' && specLSL < yMin && specLSL > (coreMin - coreRange * proximityFactor)) {
+                 yMin = specLSL - buffer * 0.5; // Expand slightly to include nearby LSL
+            }
+
+
+            const xbarOption = {
+                tooltip: commonTooltip,
+                // Increase grid padding if axis labels/names overlap
+                grid: { left: '10%', right: '8%', bottom: '12%', containLabel: false },
+                xAxis: { type: 'category', data: indices, name: '子组序号', nameLocation: 'middle', nameGap: 30 }, // Increased nameGap
+                yAxis: {
+                    type: 'value', name: 'X-bar 值', nameLocation: 'middle', nameGap: 60, // Increased nameGap
+                    // *** Apply NEW Optimized Y-Axis Scaling ***
+                    min: formatNum(yMin, 5),
+                    max: formatNum(yMax, 5),
+                    interval: coreRange > 0 ? undefined : 0.0002, // Auto interval, unless range is zero
+                    axisLabel: { formatter: (value) => value.toFixed(5) } // Increase precision if needed
+                },
+                series: [{
+                    name: 'X-bar', type: 'line', data: xData, symbolSize: 7,
+                    lineStyle: { color: '#2b6cb0', width: 2 }, itemStyle: { color: '#2b6cb0' },
+                    markLine: {
+                        silent: true, ...markLineStyle,
+                        data: [
+                            // Mark lines will draw even if outside the yAxis min/max range
+                            { yAxis: xCL, name: 'CL', lineStyle: { color: 'blue', type: 'solid' } },
+                            { yAxis: xUCL, name: 'UCL', lineStyle: { color: 'red', type: 'solid' } },
+                            { yAxis: xLCL, name: 'LCL', lineStyle: { color: 'red', type: 'solid' } },
+                            ...(typeof specUSL === 'number' ? [{ yAxis: specUSL, name: 'USL', lineStyle: { color: 'green', type: 'dashed' } }] : []),
+                            ...(typeof specLSL === 'number' ? [{ yAxis: specLSL, name: 'LSL', lineStyle: { color: 'green', type: 'dashed' } }] : [])
+                        ]
+                    },
+                     markPoint: {
+                         symbol: 'circle', symbolSize: 10, itemStyle: { color: 'red' }, label: { show: false },
+                         data: xData.map((val, idx) => ({
+                             name: `Subgroup ${idx + 1}`, value: val, coord: [idx, val], // Use index for x-coordinate
+                             itemStyle: (val < xLCL || val > xUCL) ? { color: 'red' } : { color: 'transparent' }
+                         })).filter(p => p.itemStyle.color === 'red')
+                    }
+                }],
+                dataZoom: [ { type: 'inside', start: 0, end: 100 }, { type: 'slider', height: 20, bottom: 5 } ]
+            };
+
+            // --- R Chart Y-axis Scaling Logic (remains similar, usually less problematic) ---
+            const rDataMin = Math.min(...rData);
+            const rDataMax = Math.max(...rData);
+            const rRange = rUCL - rLCL;
+             const rBuffer = Math.max(rRange * 0.2, Math.abs(rDataMax-rDataMin)*0.1, 0.0001); // Adjusted minimum buffer slightly
+            const rMinY = Math.max(0, Math.min(rLCL, rDataMin) - rBuffer); // Ensure min is not negative
+            const rMaxY = Math.max(rUCL, rDataMax) + rBuffer;
+
+            const rOption = {
+                tooltip: commonTooltip,
+                grid: { left: '10%', right: '8%', bottom: '12%', containLabel: false }, // Adjusted padding
+                xAxis: { type: 'category', data: indices, name: '子组序号', nameLocation: 'middle', nameGap: 30 }, // Increased nameGap
+                yAxis: {
+                    type: 'value', name: 'R 值', nameLocation: 'middle', nameGap: 45, // Adjusted gap
+                    min: formatNum(rMinY, 5),
+                    max: formatNum(rMaxY, 5),
+                    axisLabel: { formatter: (value) => value.toFixed(5) } // Increased precision if needed
+                },
+                series: [{
+                    name: 'R', type: 'line', data: rData, symbolSize: 7,
+                    lineStyle: { color: '#38a169', width: 2 }, itemStyle: { color: '#38a169' },
+                    markLine: {
+                        silent: true, ...markLineStyle,
+                        data: [
+                            { yAxis: rCL, name: 'CL', lineStyle: { color: 'blue', type: 'solid' } },
+                            { yAxis: rUCL, name: 'UCL', lineStyle: { color: 'red', type: 'solid' } },
+                            ...(rLCL > 0 ? [{ yAxis: rLCL, name: 'LCL', lineStyle: { color: 'red', type: 'solid' } }] : [])
+                        ]
+                    },
+                     markPoint: {
+                         symbol: 'circle', symbolSize: 10, itemStyle: { color: 'red' }, label: { show: false },
+                         data: rData.map((val, idx) => ({
+                             name: `Subgroup ${idx + 1}`, value: val, coord: [idx, val], // Use index for x-coordinate
+                             itemStyle: (val < rLCL || val > rUCL) ? { color: 'red' } : { color: 'transparent' }
+                         })).filter(p => p.itemStyle.color === 'red')
+                     }
+                }],
+                dataZoom: [ { type: 'inside', start: 0, end: 100 }, { type: 'slider', height: 20, bottom: 5 } ]
+            };
+
+            // 应用配置到图表
+            xbarChart.setOption(xbarOption, true);
+            rChart.setOption(rOption, true);
+
+            // Store chart instances for resizing
+            window.currentCharts = { xbar: xbarChart, r: rChart };
+        }
+        // --- Tab 切换和窗口大小调整 ---
+        document.addEventListener('DOMContentLoaded', (event) => {
+             // Run calculation and display on load
+            calculateAndDisplay();
+
+            const btnXbar = document.getElementById('btn-xbar');
+            const btnR = document.getElementById('btn-r');
+            const xbarSection = document.getElementById('xbar-chart-section');
+            const rSection = document.getElementById('r-chart-section');
+
+            if(btnXbar && btnR && xbarSection && rSection) {
+                btnXbar.addEventListener('click', () => {
+                    xbarSection.classList.remove('hidden');
+                    rSection.classList.add('hidden');
+                    btnXbar.classList.add('active');
+                    btnR.classList.remove('active');
+                    if (window.currentCharts?.xbar) setTimeout(() => window.currentCharts.xbar.resize(), 50);
+                });
+
+                btnR.addEventListener('click', () => {
+                    xbarSection.classList.add('hidden');
+                    rSection.classList.remove('hidden');
+                    btnXbar.classList.remove('active');
+                    btnR.classList.add('active');
+                    if (window.currentCharts?.r) setTimeout(() => window.currentCharts.r.resize(), 50);
+                });
+            } else {
+                console.error("Tab button or section elements not found!");
+            }
+
+            // Resize charts on window resize
+            window.addEventListener('resize', () => {
+                 if (window.currentCharts?.xbar && !xbarSection.classList.contains('hidden')) {
+                    window.currentCharts.xbar.resize();
+                 }
+                 if (window.currentCharts?.r && !rSection.classList.contains('hidden')) {
+                     window.currentCharts.r.resize();
+                 }
+            });
+         }); // End of DOMContentLoaded listener
+
+    </script>
+
+</body>
+</html>
