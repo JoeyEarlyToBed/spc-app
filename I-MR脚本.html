@@ -675,48 +675,68 @@
             window.currentCharts = { i: iChart, mr: mrChart };
         }
 
-        // --- Tab 切换和窗口大小调整 (same as before) ---
-        document.addEventListener('DOMContentLoaded', (event) => { /* ... */
-             const urlParams = new URLSearchParams(window.location.search);
-             const dataParam = urlParams.get('data');
-             const uslParam = urlParams.get('usl');
-             const lslParam = urlParams.get('lsl');
-              try {
-                  if (dataParam) rawData = JSON.parse(decodeURIComponent(dataParam));
-                  else throw new Error("URL中未找到数据参数。");
-                  if (uslParam && uslParam !== 'null') USL = parseFloat(decodeURIComponent(uslParam));
-                  else USL = null;
-                  if (lslParam && lslParam !== 'null') LSL = parseFloat(decodeURIComponent(lslParam));
-                  else LSL = null;
-                  if (isNaN(USL)) USL = null;
-                  if (isNaN(LSL)) LSL = null;
-                  calculateAndDisplay();
-              } catch (error) {
-                  console.error("无法从URL参数加载或解析数据:", error);
-                  displayError("错误: 无法加载或解析数据 - " + error.message);
-                  return;
-              }
-              const btnI = document.getElementById('btn-i');
-              const btnMR = document.getElementById('btn-mr');
-              const iSection = document.getElementById('i-chart-section');
-              const mrSection = document.getElementById('mr-chart-section');
-              if (btnI && btnMR && iSection && mrSection) {
-                  btnI.addEventListener('click', () => {
-                      iSection.classList.remove('hidden'); mrSection.classList.add('hidden');
-                      btnI.classList.add('active'); btnMR.classList.remove('active');
-                      if (window.currentCharts?.i) setTimeout(() => window.currentCharts.i.resize(), 50);
-                  });
-                  btnMR.addEventListener('click', () => {
-                      iSection.classList.add('hidden'); mrSection.classList.remove('hidden');
-                      btnI.classList.remove('active'); btnMR.classList.add('active');
-                      if (window.currentCharts?.mr) setTimeout(() => window.currentCharts.mr.resize(), 50);
-                  });
-              } else { console.error("Tab button or section elements not found!"); }
-              window.addEventListener('resize', () => {
-                  if (window.currentCharts?.i && !iSection.classList.contains('hidden')) window.currentCharts.i.resize();
-                  if (window.currentCharts?.mr && !mrSection.classList.contains('hidden')) window.currentCharts.mr.resize();
-              });
-         });
+// --- Tab 切换和窗口大小调整 ---
+document.addEventListener('DOMContentLoaded', (event) => {
+             // *** 修改开始: 从 localStorage 读取数据 ***
+             try {
+                 const dataString = localStorage.getItem('spcData');
+                 const uslString = localStorage.getItem('spcUSL');
+                 const lslString = localStorage.getItem('spcLSL');
+                 // 可选：读取分析类型，虽然本脚本只处理IMR，但可以读取以备将来扩展
+                 // const analysisType = localStorage.getItem('spcAnalysisType');
+
+                 if (dataString) {
+                     rawData = JSON.parse(dataString);
+                 } else {
+                      throw new Error("localStorage 中未找到'spcData'。");
+                 }
+
+                 // 解析 USL/LSL, 注意它们可能是 'null' 字符串
+                 USL = (uslString && uslString !== 'null') ? parseFloat(JSON.parse(uslString)) : null;
+                 LSL = (lslString && lslString !== 'null') ? parseFloat(JSON.parse(lslString)) : null;
+
+                 if (isNaN(USL)) USL = null; // 处理解析可能产生的 NaN
+                 if (isNaN(LSL)) LSL = null;
+
+                 // 可选: 使用后清除 localStorage 中的数据，避免干扰
+                 // localStorage.removeItem('spcData');
+                 // localStorage.removeItem('spcUSL');
+                 // localStorage.removeItem('spcLSL');
+                 // localStorage.removeItem('spcAnalysisType');
+                 // localStorage.removeItem('spcAdditionalData'); // 也清除可能存在的额外数据
+
+                 calculateAndDisplay(); // 使用从 localStorage 获取的数据运行分析
+
+             } catch (error) {
+                 console.error("无法从 localStorage 加载或解析数据:", error);
+                   displayError("错误: 无法加载或解析所需数据 - " + error.message + "。请确保从首页正确导航。");
+                   return; // 如果数据加载失败则停止执行
+             }
+             // *** 修改结束 ***
+
+
+             // --- Tab 和 Resize Logic (保持不变) ---
+             const btnI = document.getElementById('btn-i');
+             const btnMR = document.getElementById('btn-mr');
+             const iSection = document.getElementById('i-chart-section');
+             const mrSection = document.getElementById('mr-chart-section');
+             if (btnI && btnMR && iSection && mrSection) {
+                 btnI.addEventListener('click', () => {
+                     iSection.classList.remove('hidden'); mrSection.classList.add('hidden');
+                     btnI.classList.add('active'); btnMR.classList.remove('active');
+                     if (window.currentCharts?.i) setTimeout(() => window.currentCharts.i.resize(), 50);
+                 });
+                 btnMR.addEventListener('click', () => {
+                     iSection.classList.add('hidden'); mrSection.classList.remove('hidden');
+                     btnI.classList.remove('active'); btnMR.classList.add('active');
+                     if (window.currentCharts?.mr) setTimeout(() => window.currentCharts.mr.resize(), 50);
+                 });
+             } else { console.error("Tab button or section elements not found!"); }
+             window.addEventListener('resize', () => {
+                 if (window.currentCharts?.i && !iSection.classList.contains('hidden')) window.currentCharts.i.resize();
+                 if (window.currentCharts?.mr && !mrSection.classList.contains('hidden')) window.currentCharts.mr.resize();
+             });
+        });
 
     </script>
 

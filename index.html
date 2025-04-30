@@ -5,290 +5,93 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>库卡中国-SPC质量分析工具</title>
     <style>
-        /* CSS Variables (same as before) */
+        /* CSS (保持不变) */
         :root {
-            --kuka-orange: #e67e22;
-            --kuka-orange-dark: #d35400;
-            --kuka-orange-light: #f39c12;
-            --background-light: #f8f9fa;
-            --card-background: #ffffff;
-            --text-dark: #2c3e50;
-            --text-medium: #555;
-            --text-light: #7f8c8d;
-            --border-color: #e0e0e0;
-            --error-color: #e74c3c;
-            --success-color: #2ecc71;
-            --input-glow-color: rgba(230, 126, 34, 0.25);
-            --shadow-color: rgba(0, 0, 0, 0.1);
+            --kuka-orange: #e67e22; --kuka-orange-dark: #d35400; --kuka-orange-light: #f39c12;
+            --background-light: #f8f9fa; --card-background: #ffffff; --text-dark: #2c3e50;
+            --text-medium: #555; --text-light: #7f8c8d; --border-color: #e0e0e0;
+            --error-color: #e74c3c; --success-color: #2ecc71;
+            --input-glow-color: rgba(230, 126, 34, 0.25); --shadow-color: rgba(0, 0, 0, 0.1);
         }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-15px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes iconBob {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-4px); }
-        }
-
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-15px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes iconBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            padding: 20px;
-            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
-            color: var(--text-dark);
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            box-sizing: border-box;
-            padding-top: 5vh;
+            padding: 20px; background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); color: var(--text-dark);
+            display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; box-sizing: border-box; padding-top: 5vh;
         }
         .container {
-            background-color: var(--card-background);
-            padding: 35px 50px;
-            border-radius: 15px;
-            box-shadow: 0 8px 30px var(--shadow-color);
-            width: 100%;
-            max-width: 750px;
-            animation: fadeIn 0.7s ease-out forwards;
-            border-top: 5px solid var(--kuka-orange);
-            margin-bottom: 5vh;
+            background-color: var(--card-background); padding: 35px 50px; border-radius: 15px;
+            box-shadow: 0 8px 30px var(--shadow-color); width: 100%; max-width: 750px;
+            animation: fadeIn 0.7s ease-out forwards; border-top: 5px solid var(--kuka-orange); margin-bottom: 5vh;
         }
         h1 {
-            text-align: center;
-            color: var(--kuka-orange);
-            margin-bottom: 20px;
-            font-weight: 700;
-            font-size: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
+            text-align: center; color: var(--kuka-orange); margin-bottom: 20px; font-weight: 700; font-size: 2rem;
+            display: flex; align-items: center; justify-content: center; gap: 12px;
         }
-         h1 .icon {
-             font-size: 2.5rem;
-             vertical-align: middle;
-             animation: iconBob 2s ease-in-out infinite;
-         }
-        .intro, .instructions, .form-section {
-             margin-bottom: 30px;
-             line-height: 1.7;
-             font-size: 1rem;
-             color: var(--text-medium);
-             text-align: left;
-         }
-          .intro p:first-child {
-             font-weight: 500;
-             color: var(--text-dark);
-         }
-         .instructions h4 {
-             color: var(--kuka-orange);
-             margin-top: 20px;
-             margin-bottom: 10px;
-             font-weight: 600;
-             border-bottom: 1px solid #eee;
-             padding-bottom: 6px;
-             font-size: 1.1rem;
-         }
-         .instructions ul {
-             list-style-type: none;
-             padding-left: 10px;
-             margin-top: 8px;
-         }
-          .instructions li {
-             margin-bottom: 8px;
-             position: relative;
-             padding-left: 20px;
-          }
-          .instructions li::before {
-             content: '➤'; position: absolute; left: 0;
-             color: var(--kuka-orange-light); font-size: 0.9em; top: 3px;
-          }
-          .instructions code {
-            background-color: #f1f2f6; padding: 3px 6px; border-radius: 4px;
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-            color: #e84118; font-size: 0.9em;
-          }
-           .instructions pre {
-              background-color: #f8f8f8; border: 1px solid #eee; padding: 10px;
-              border-radius: 4px; overflow-x: auto; margin: 5px 0 10px 0; font-size: 0.85em;
-           }
-        label {
-            display: block;
-            margin-bottom: 10px;
-            font-weight: 600;
-            color: var(--text-dark);
-            font-size: 1.05rem;
-        }
-        textarea, input[type="number"], input[type="text"], select { /* Added select */
-            width: 100%;
-            padding: 12px 15px;
-            margin-bottom: 8px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-size: 1rem;
-            transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
-            background-color: #fff; /* Ensure select background is white */
-        }
-        textarea {
-            min-height: 170px;
-            resize: vertical;
-        }
-        textarea:focus, input[type="number"]:focus, input[type="text"]:focus, select:focus {
-            border-color: var(--kuka-orange);
-            box-shadow: 0 0 8px var(--input-glow-color);
-            transform: scale(1.01);
-            outline: none;
-        }
-        button {
-            width: 100%;
-            padding: 15px;
-            margin-top: 30px;
-            background: linear-gradient(145deg, var(--kuka-orange-light), var(--kuka-orange));
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1.2rem;
-            font-weight: 700;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(230, 126, 34, 0.3);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        button:hover {
-            background: linear-gradient(145deg, var(--kuka-orange), var(--kuka-orange-dark));
-            transform: translateY(-3px) scale(1.01);
-            box-shadow: 0 6px 20px rgba(211, 84, 0, 0.4);
-        }
-         button:active {
-             transform: translateY(1px) scale(0.99);
-             box-shadow: 0 2px 8px rgba(211, 84, 0, 0.3);
-         }
-        .input-group {
-            display: flex;
-            gap: 25px;
-            margin-bottom: 8px;
-        }
-        .input-group > div {
-            flex: 1;
-        }
-         .input-group > div > label, .input-group > div > input {
-             margin-bottom: 0;
-         }
-        #error-message {
-            color: var(--error-color);
-            margin-top: 25px;
-            text-align: center;
-            font-weight: 500;
-            min-height: 1.2em;
-        }
-        .tooltip {
-            font-size: 0.88rem;
-            color: var(--text-light);
-            margin-bottom: 20px;
-            margin-top: 5px;
-            display: block;
-            line-height: 1.5;
-        }
-        /* Styles for conditional inputs */
-        .conditional-inputs {
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px dashed #eee;
-            display: none; /* Initially hidden */
-        }
-        .conditional-inputs.visible {
-            display: block; /* Show when needed */
-        }
-        .conditional-inputs label {
-            font-weight: 500;
-            font-size: 1rem;
-        }
-        .conditional-inputs textarea {
-            min-height: 80px;
-        }
+        h1 .icon { font-size: 2.5rem; vertical-align: middle; animation: iconBob 2s ease-in-out infinite; }
+        .intro, .instructions, .form-section { margin-bottom: 30px; line-height: 1.7; font-size: 1rem; color: var(--text-medium); text-align: left; }
+        .intro p:first-child { font-weight: 500; color: var(--text-dark); }
+        .instructions h4 { color: var(--kuka-orange); margin-top: 20px; margin-bottom: 10px; font-weight: 600; border-bottom: 1px solid #eee; padding-bottom: 6px; font-size: 1.1rem; }
+        .instructions ul { list-style-type: none; padding-left: 10px; margin-top: 8px; }
+        .instructions li { margin-bottom: 8px; position: relative; padding-left: 20px; }
+        .instructions li::before { content: '➤'; position: absolute; left: 0; color: var(--kuka-orange-light); font-size: 0.9em; top: 3px; }
+        .instructions code { background-color: #f1f2f6; padding: 3px 6px; border-radius: 4px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; color: #e84118; font-size: 0.9em; }
+        .instructions pre { background-color: #f8f8f8; border: 1px solid #eee; padding: 10px; border-radius: 4px; overflow-x: auto; margin: 5px 0 10px 0; font-size: 0.85em; }
+        label { display: block; margin-bottom: 10px; font-weight: 600; color: var(--text-dark); font-size: 1.05rem; }
+        textarea, input[type="number"], input[type="text"], select { width: 100%; padding: 12px 15px; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; font-size: 1rem; transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease; background-color: #fff; }
+        textarea { min-height: 170px; resize: vertical; }
+        textarea:focus, input[type="number"]:focus, input[type="text"]:focus, select:focus { border-color: var(--kuka-orange); box-shadow: 0 0 8px var(--input-glow-color); transform: scale(1.01); outline: none; }
+        button { width: 100%; padding: 15px; margin-top: 30px; background: linear-gradient(145deg, var(--kuka-orange-light), var(--kuka-orange)); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1.2rem; font-weight: 700; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(230, 126, 34, 0.3); text-transform: uppercase; letter-spacing: 1px; }
+        button:hover { background: linear-gradient(145deg, var(--kuka-orange), var(--kuka-orange-dark)); transform: translateY(-3px) scale(1.01); box-shadow: 0 6px 20px rgba(211, 84, 0, 0.4); }
+        button:active { transform: translateY(1px) scale(0.99); box-shadow: 0 2px 8px rgba(211, 84, 0, 0.3); }
+        .input-group { display: flex; gap: 25px; margin-bottom: 8px; }
+        .input-group > div { flex: 1; }
+        .input-group > div > label, .input-group > div > input { margin-bottom: 0; }
+        #error-message { color: var(--error-color); margin-top: 25px; text-align: center; font-weight: 500; min-height: 1.2em; }
+        .tooltip { font-size: 0.88rem; color: var(--text-light); margin-bottom: 20px; margin-top: 5px; display: block; line-height: 1.5; }
+        .conditional-inputs { margin-top: 20px; padding-top: 15px; border-top: 1px dashed #eee; display: none; }
+        .conditional-inputs.visible { display: block; }
+        .conditional-inputs label { font-weight: 500; font-size: 1rem; }
+        .conditional-inputs textarea { min-height: 80px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1><span class="icon">🤖</span> 库卡中国-SPC质量分析工具</h1>
-
         <div class="intro">
-            <p><strong>欢迎使用 KUKA 中国 SPC 质量分析工具！</strong></p>
-            <p>通过输入过程测量数据，本工具可助您快速生成 I-MR, Xbar-R, Xbar-S, p, np 等控制图，并进行初步的过程能力 (Cp/Cpk/Pp/Ppk) 和稳定性（西格玛规则）分析，助力质量持续改进。</p>
+             <p><strong>欢迎使用 KUKA 中国 SPC 质量分析工具！</strong></p>
+             <p>通过输入过程测量数据，本工具可助您快速生成 I-MR, Xbar-R, Xbar-S, p, np 等控制图，并进行初步的过程能力 (Cp/Cpk/Pp/Ppk) 和稳定性（西格玛规则）分析，助力质量持续改进。</p>
         </div>
 
         <form id="spc-form">
             <div class="form-section">
-                <label for="spc-data">1. 输入测量数据:</label>
-                <textarea id="spc-data" name="spc-data" rows="8" required placeholder="请根据下方【数据格式要求】输入..."></textarea>
-                <div class="instructions">
-                    <h4>数据格式要求</h4>
-                    <ul>
-                        <li><strong>个体值 (自动选择 I-MR):</strong>
-                            <ul>
-                                <li>每行一个数据点，或所有数据点在同一行内用英文逗号 (,) 分隔。</li>
-                                <li>示例: <code>1.143, 1.138, 1.148</code> 或: <pre>1.143&#10;1.138&#10;1.148</pre></li>
-                            </ul>
-                        </li>
-                        <li><strong>子组 (自动选择 X-R/X-S):</strong>
-                           <ul>
-                                <li>每行代表一个子组。子组内数据点用英文逗号 (,) 分隔。</li>
-                                <li><strong>重要:</strong> 所有子组大小 (每行点数) 必须相同。工具会根据子组大小优先选择 X-R (n<9) 或 X-S (n≥9)。</li>
-                                <li>示例 (n=3): <pre>2.1, 2.2, 2.3&#10;2.0, 2.1, 2.2&#10;1.9, 2.0, 2.1</pre></li>
-                            </ul>
-                        </li>
-                         <li><strong>p/np 图数据:</strong>
-                            <ul>
-                                <li>请在下方手动选择图表类型。</li>
-                                <li>此输入框内应输入每组的 **不合格品数/缺陷数** (每行一组，或单行逗号分隔)。</li>
-                                <li>示例: <code>3, 2, 5, 1, 4</code> 或: <pre>3&#10;2&#10;5&#10;1&#10;4</pre></li>
-                             </ul>
-                         </li>
-                         <li>请确保输入为数值，勿含单位或文本。</li>
-                    </ul>
-                </div>
-            </div>
-
+                 <label for="spc-data">1. 输入测量数据:</label>
+                 <textarea id="spc-data" name="spc-data" rows="8" required placeholder="请根据下方【数据格式要求】输入..."></textarea>
+                  <div class="instructions">
+                      <h4>数据格式要求</h4>
+                      <ul>
+                          <li><strong>个体值 (自动选择 I-MR):</strong><ul><li>每行一个数据点，或所有数据点在同一行内用英文逗号 (,) 分隔。</li><li>示例: <code>1.143, 1.138, 1.148</code> 或: <pre>1.143&#10;1.138&#10;1.148</pre></li></ul></li>
+                          <li><strong>子组 (自动选择 X-R/X-S):</strong><ul><li>每行代表一个子组。子组内数据点用英文逗号 (,) 分隔。</li><li><strong>重要:</strong> 所有子组大小 (每行点数) 必须相同。工具会根据子组大小优先选择 X-R (n<9) 或 X-S (n≥9)。</li><li>示例 (n=3): <pre>2.1, 2.2, 2.3&#10;2.0, 2.1, 2.2&#10;1.9, 2.0, 2.1</pre></li></ul></li>
+                          <li><strong>p/np 图数据:</strong><ul><li>请在下方手动选择图表类型。</li><li>此输入框内应输入每组的 **不合格品数/缺陷数** (每行一组，或单行逗号分隔)。</li><li>示例: <code>3, 2, 5, 1, 4</code> 或: <pre>3&#10;2&#10;5&#10;1&#10;4</pre></li></ul></li>
+                          <li>确保输入为数值，勿含单位或文本。</li>
+                      </ul>
+                  </div>
+             </div>
              <div class="form-section">
-                <label for="usl">2. 输入规格界限 (可选):</label>
-                 <div class="input-group">
-                     <div>
-                         <input type="number" id="usl" name="usl" step="any" placeholder="上规格限 (USL)">
-                         <span class="tooltip"><strong>USL:</strong> 规格上限，计算过程能力(Cp/Cpk/Pp/Ppk)所需。</span>
-                     </div>
-                     <div>
-                         <input type="number" id="lsl" name="lsl" step="any" placeholder="下规格限 (LSL)">
-                         <span class="tooltip"><strong>LSL:</strong> 规格下限，计算过程能力(Cp/Cpk/Pp/Ppk)所需。</span>
-                      </div>
-                 </div>
-            </div>
-
-            <div class="form-section">
-                <label for="chart-type">3. 手动选择控制图类型 (可选):</label>
-                <select id="chart-type" name="chart-type">
-                    <option value="auto" selected>自动判断 (I-MR / Xbar-R / Xbar-S)</option>
-                    <option value="xs">Xbar-S 图 (均值-标准差图)</option>
-                    <option value="p">p 图 (不良品率图 - 样本量可变)</option>
-                    <option value="np">np 图 (不良品数图 - 样本量固定)</option>
-                    </select>
-                <span class="tooltip">默认根据数据格式自动选择 I-MR 或 X-R/X-S。如需使用 p 图或 np 图等，请在此手动选择，并按提示填写下方所需信息。</span>
-            </div>
-
-            <div id="conditional-inputs-p" class="conditional-inputs">
-                <label for="p-sample-sizes">为 p 图输入每组对应的样本量:</label>
-                <textarea id="p-sample-sizes" name="p-sample-sizes" rows="3" placeholder="每行一个样本量，或单行逗号分隔，需与上方数据行/个数一一对应。
-示例: 100, 105, 98, 100, 102"></textarea>
-                <span class="tooltip">p 图要求输入每组检查的总数（样本大小），行的顺序和数量必须与上方输入的不合格品数数据完全一致。</span>
-            </div>
-            <div id="conditional-inputs-np" class="conditional-inputs">
-                <label for="np-sample-size">为 np 图输入固定的子组样本量:</label>
-                <input type="number" id="np-sample-size" name="np-sample-size" min="1" step="1" placeholder="输入一个正整数">
-                <span class="tooltip">np 图要求所有子组的样本大小都相同。</span>
-            </div>
+                 <label for="usl">2. 输入规格界限 (可选):</label>
+                  <div class="input-group">
+                      <div><input type="number" id="usl" name="usl" step="any" placeholder="上规格限 (USL)"><span class="tooltip"><strong>USL:</strong> 规格上限，计算过程能力(Cp/Cpk/Pp/Ppk)所需。</span></div>
+                      <div><input type="number" id="lsl" name="lsl" step="any" placeholder="下规格限 (LSL)"><span class="tooltip"><strong>LSL:</strong> 规格下限，计算过程能力(Cp/Cpk/Pp/Ppk)所需。</span></div>
+                  </div>
+             </div>
+             <div class="form-section">
+                 <label for="chart-type">3. 手动选择控制图类型 (可选):</label>
+                 <select id="chart-type" name="chart-type"><option value="auto" selected>自动判断 (I-MR / Xbar-R / Xbar-S)</option><option value="xs">Xbar-S 图 (均值-标准差图)</option><option value="p">p 图 (不良品率图 - 样本量可变)</option><option value="np">np 图 (不良品数图 - 样本量固定)</option></select>
+                 <span class="tooltip">默认根据数据格式自动选择。如需使用 p 图或 np 图等，请在此手动选择，并按提示填写下方所需信息。</span>
+             </div>
+             <div id="conditional-inputs-p" class="conditional-inputs"><label for="p-sample-sizes">为 p 图输入每组对应的样本量:</label><textarea id="p-sample-sizes" name="p-sample-sizes" rows="3" placeholder="每行一个样本量，或单行逗号分隔，需与上方数据行/个数一一对应。&#10;示例: 100, 105, 98, 100, 102"></textarea><span class="tooltip">p 图要求输入每组检查的总数（样本大小），顺序和数量必须与数据输入一致。</span></div>
+             <div id="conditional-inputs-np" class="conditional-inputs"><label for="np-sample-size">为 np 图输入固定的子组样本量:</label><input type="number" id="np-sample-size" name="np-sample-size" min="1" step="1" placeholder="输入一个正整数"><span class="tooltip">np 图要求所有子组的样本大小都相同。</span></div>
 
             <button type="submit">开始分析</button>
         </form>
@@ -300,7 +103,6 @@
         const conditionalP = document.getElementById('conditional-inputs-p');
         const conditionalNp = document.getElementById('conditional-inputs-np');
 
-        // Show/hide conditional inputs based on chart type selection
         chartTypeSelect.addEventListener('change', function() {
             conditionalP.classList.remove('visible');
             conditionalNp.classList.remove('visible');
@@ -311,7 +113,6 @@
             }
         });
 
-        // Form submission logic using localStorage
         document.getElementById('spc-form').addEventListener('submit', function(event) {
             event.preventDefault();
             const errorMessageDiv = document.getElementById('error-message');
@@ -320,28 +121,21 @@
             const dataInput = document.getElementById('spc-data').value.trim();
             const uslInput = document.getElementById('usl').value;
             const lslInput = document.getElementById('lsl').value;
-            const selectedChartType = chartTypeSelect.value; // 'auto', 'xs', 'p', 'np'
+            const selectedChartType = chartTypeSelect.value;
 
-            const usl = uslInput === '' ? null : parseFloat(uslInput); // Store as null
-            const lsl = lslInput === '' ? null : parseFloat(lslInput); // Store as null
+            const usl = uslInput === '' ? null : parseFloat(uslInput);
+            const lsl = lslInput === '' ? null : parseFloat(lslInput);
 
-            if (dataInput === '') {
-                errorMessageDiv.textContent = '错误: 请输入测量数据。';
-                return;
-            }
+            if (dataInput === '') { errorMessageDiv.textContent = '错误: 请输入测量数据。'; return; }
 
             let data;
-            let analysisType; // 'imr', 'xr', 'xs', 'p', 'np'
+            let analysisType;
             let targetScript;
-            let additionalData = {}; // For p/np chart specific data
+            let additionalData = {};
 
             try {
-                 // --- Data Parsing ---
-                 // Always parse based on lines and commas first
                  const lines = dataInput.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-                 if (lines.length === 0) {
-                     throw new Error("输入的数据为空或无效。");
-                 }
+                 if (lines.length === 0) { throw new Error("输入的数据为空或无效。"); }
 
                  let subgroupSize = -1;
                  let isConsistentSize = true;
@@ -351,86 +145,88 @@
                                       .filter(val => val !== '')
                                       .map(val => {
                                           const num = parseFloat(val);
-                                          if (isNaN(num)) {
-                                              throw new Error(`第 ${index + 1} 行包含无效数值: "${val}"`);
-                                          }
+                                          if (isNaN(num)) throw new Error(`第 ${index + 1} 行包含无效数值: "${val}"`);
                                           return num;
                                       });
                      if (values.length === 0) throw new Error(`第 ${index + 1} 行为空或只包含分隔符。`);
-                     if (index === 0) subgroupSize = values.length;
-                     else if (values.length !== subgroupSize) isConsistentSize = false;
+
+                     if (index === 0) {
+                         subgroupSize = values.length;
+                     } else if (values.length !== subgroupSize) {
+                         isConsistentSize = false; // Mark inconsistency, but don't throw error yet
+                     }
                      return values;
                  });
 
-                // --- Chart Type Determination and Data Formatting ---
+                 // --- Refined Chart Type Determination ---
                  if (selectedChartType === 'auto' || selectedChartType === 'xs') {
-                     if (parsedData.length === 1) { // Single line input
-                         if (subgroupSize > 1) { analysisType = 'imr'; data = parsedData[0]; if (data.length < 2) throw new Error("I-MR 图至少需要2个数据点。"); }
-                         else { throw new Error("I-MR 图至少需要2个数据点。"); }
-                     } else { // Multiple lines input
-                         if (!isConsistentSize) throw new Error("X-R/X-S 图要求所有子组大小相同。请检查数据格式或将数据整理为个体值。");
-                         if (subgroupSize >= 2) {
-                            // Auto select X-S if n >= 9 (or if explicitly selected), otherwise X-R
-                            if (selectedChartType === 'xs' || subgroupSize >= 9) {
-                                analysisType = 'xs';
-                            } else {
-                                analysisType = 'xr';
-                            }
-                            data = parsedData;
-                            if (parsedData.length < 2) throw new Error("X-R/X-S 图至少需要2个子组。");
-                         } else { // subgroupSize === 1
-                            analysisType = 'imr'; data = parsedData.map(arr => arr[0]);
-                            if (data.length < 2) throw new Error("I-MR 图至少需要2个数据点。");
-                         }
+                     // Check for I-MR cases first
+                     const isMultiLineSingleValue = parsedData.length > 1 && subgroupSize === 1 && isConsistentSize;
+                     const isSingleLineMultiValue = parsedData.length === 1 && subgroupSize > 1;
+
+                     if (isMultiLineSingleValue || isSingleLineMultiValue) {
+                         analysisType = 'imr';
+                         data = isMultiLineSingleValue ? parsedData.map(arr => arr[0]) : parsedData[0];
+                         if (data.length < 2) throw new Error("I-MR 图至少需要2个数据点。");
                      }
+                     // Check for X-R/X-S case
+                     else if (parsedData.length >= 2 && subgroupSize >= 2 && isConsistentSize) {
+                         analysisType = (selectedChartType === 'xs' || subgroupSize >= 9) ? 'xs' : 'xr';
+                         data = parsedData;
+                         if (data.length < 2) throw new Error("X-R/X-S 图至少需要2个子组。");
+                     }
+                     // Check for inconsistent subgroup size ONLY if it wasn't identified as I-MR
+                     else if (parsedData.length > 1 && !isConsistentSize) {
+                         throw new Error("子组大小不一致。X-R/X-S 图要求所有子组大小相同。请检查数据或选择适合的图表类型。");
+                     }
+                     // Otherwise, format is likely incorrect or insufficient
+                     else {
+                         throw new Error("无法根据数据格式自动判断图表类型。请检查数据或手动选择图表类型。");
+                     }
+
                  } else if (selectedChartType === 'p') {
                      analysisType = 'p';
-                     // Expects defect counts per line/entry
-                     if (subgroupSize > 1) throw new Error("p 图数据格式错误：每行应只包含一个不合格品计数值。");
-                     data = parsedData.map(arr => arr[0]); // Defect counts
+                     if (subgroupSize > 1) throw new Error("p 图数据格式错误：主数据框每行应只包含一个不合格品计数值。");
+                     data = parsedData.map(arr => arr[0]);
 
                      const sampleSizesInput = document.getElementById('p-sample-sizes').value.trim();
                      if (!sampleSizesInput) throw new Error("p 图需要输入对应的样本量。");
-                     const sampleSizes = sampleSizesInput.split(/[\n,]+/) // Split by newline or comma
-                                             .map(s => s.trim())
-                                             .filter(s => s !== '')
-                                             .map(s => parseInt(s));
+                     const sampleSizes = sampleSizesInput.split(/[\n,]+/).map(s => s.trim()).filter(s => s !== '').map(s => parseInt(s));
                      if (sampleSizes.some(isNaN) || sampleSizes.some(n => n <= 0)) throw new Error("p 图样本量必须是正整数。");
-                     if (sampleSizes.length !== data.length) throw new Error("p 图样本量个数必须与数据点/组数相同。");
-                     additionalData.sampleSizes = sampleSizes; // Store sample sizes
+                     if (sampleSizes.length !== data.length) throw new Error("p 图样本量个数 (" + sampleSizes.length + ") 必须与数据点/组数 (" + data.length + ") 相同。");
+                     additionalData.sampleSizes = sampleSizes;
 
                  } else if (selectedChartType === 'np') {
                      analysisType = 'np';
-                      // Expects defect counts per line/entry
-                     if (subgroupSize > 1) throw new Error("np 图数据格式错误：每行应只包含一个不合格品计数值。");
-                     data = parsedData.map(arr => arr[0]); // Defect counts
+                     if (subgroupSize > 1) throw new Error("np 图数据格式错误：主数据框每行应只包含一个不合格品计数值。");
+                     data = parsedData.map(arr => arr[0]);
 
                      const sampleSizeInput = document.getElementById('np-sample-size').value;
                      if (!sampleSizeInput) throw new Error("np 图需要输入固定的子组样本量。");
                      const sampleSize = parseInt(sampleSizeInput);
                      if (isNaN(sampleSize) || sampleSize <= 0) throw new Error("np 图样本量必须是正整数。");
-                     additionalData.sampleSize = sampleSize; // Store fixed sample size
+                     additionalData.sampleSize = sampleSize;
                  }
 
-                 // --- Determine Target Script ---
+                 // Determine Target Script
                  switch (analysisType) {
                      case 'imr': targetScript = 'I-MR脚本.html'; break;
                      case 'xr': targetScript = 'X-R脚本.html'; break;
-                     case 'xs': targetScript = 'X-S脚本.html'; break; // Assuming you'll create this
-                     case 'p': targetScript = 'p-chart脚本.html'; break; // Assuming you'll create this
-                     case 'np': targetScript = 'np-chart脚本.html'; break; // Assuming you'll create this
-                     default: throw new Error("无法确定图表类型。");
+                     case 'xs': targetScript = 'X-S脚本.html'; break;
+                     case 'p': targetScript = 'p-chart脚本.html'; break;
+                     case 'np': targetScript = 'np-chart脚本.html'; break;
+                     default: throw new Error("无法确定目标分析脚本。");
                  }
 
-                 // --- Save data to localStorage and redirect ---
+                 // Save data to localStorage and redirect
                  localStorage.setItem('spcAnalysisType', analysisType);
                  localStorage.setItem('spcData', JSON.stringify(data));
-                 localStorage.setItem('spcUSL', JSON.stringify(usl)); // Store null correctly
-                 localStorage.setItem('spcLSL', JSON.stringify(lsl)); // Store null correctly
+                 localStorage.setItem('spcUSL', JSON.stringify(usl));
+                 localStorage.setItem('spcLSL', JSON.stringify(lsl));
                  if (Object.keys(additionalData).length > 0) {
                      localStorage.setItem('spcAdditionalData', JSON.stringify(additionalData));
                  } else {
-                      localStorage.removeItem('spcAdditionalData'); // Clean up if not needed
+                      localStorage.removeItem('spcAdditionalData');
                  }
 
                  window.location.href = targetScript;

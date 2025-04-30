@@ -258,6 +258,10 @@
     </div>
 
     <script>
+        
+        let rawData = [];
+        let USL = null;
+        let LSL = null;
         // --- 控制图常数表 ---
         // Key: n (subgroup size)
         // Values: { A2, D3, D4, d2, c4 }
@@ -274,40 +278,6 @@
             // Add more constants if needed for larger n
         };
 
-        // --- 数据输入 ---
-        // 结构: k 组 n 个采样数据
-        // 例: 25组，每组5个样本 (k=25, n=5)
-        const rawData = [
-            [16.982,16.982,16.982,16.982,16.982], // Subgroup 1
-            [16.983,16.982,16.982,16.981,16.982], // Subgroup 2
-            [16.983,16.981,16.981,16.983,16.982], // Subgroup 3
-            [16.983,16.981,16.982,16.982,16.982], // Subgroup 4
-            [16.982,16.983,16.982,16.981,16.982], // Subgroup 5
-            [16.982,16.982,16.982,16.983,16.981], // Subgroup 6
-            [16.983,16.981,16.982,16.981,16.982], // Subgroup 7
-            [16.982,16.983,16.981,16.982,16.981], // Subgroup 8
-            [16.983,16.981,16.982,16.983,16.983], // Subgroup 9
-            [16.982,16.981,16.982,16.981,16.982], // Subgroup 10
-            [16.982,16.981,16.981,16.982,16.982], // Subgroup 11
-            [16.982,16.983,16.982,16.982,16.982], // Subgroup 12
-            [16.981,16.983,16.982,16.983,16.981], // Subgroup 13
-            [16.983,16.982,16.982,16.982,16.982], // Subgroup 14
-            [16.982,16.982,16.982,16.981,16.982], // Subgroup 15
-            [16.982,16.982,16.983,16.983,16.982], // Subgroup 16
-            [16.982,16.983,16.982,16.982,16.981], // Subgroup 17
-            [16.982,16.983,16.983,16.983,16.982], // Subgroup 18
-            [16.982,16.983,16.982,16.982,16.982], // Subgroup 19
-            [16.982,16.981,16.982,16.981,16.982], // Subgroup 20
-            [16.981,16.981,16.983,16.983,16.982], // Subgroup 21
-            [16.981,16.981,16.982,16.981,16.982], // Subgroup 22
-            [16.982,16.983,16.981,16.981,16.982], // Subgroup 23
-            [16.983,16.981,16.982,16.982,16.981], // Subgroup 24
-            [16.982,16.981,16.981,16.981,16.983] // Subgroup 25
-        ];
-
-        // --- 规格限 ---
-        const USL = 16.986;
-        const LSL = 16.973;
 
         // --- Helper Functions ---
         const formatNum = (num, digits = 6) => (typeof num === 'number' && isFinite(num)) ? num.toFixed(digits) : 'N/A';
@@ -674,11 +644,59 @@ function initializeCharts(indices, xData, rData, xCL, xUCL, xLCL, rCL, rUCL, rLC
             // Store chart instances for resizing
             window.currentCharts = { xbar: xbarChart, r: rChart };
         }
-        // --- Tab 切换和窗口大小调整 ---
-        document.addEventListener('DOMContentLoaded', (event) => {
-             // Run calculation and display on load
-            calculateAndDisplay();
+// --- Tab 切换和窗口大小调整 ---
+document.addEventListener('DOMContentLoaded', (event) => {
+             // *** 修改开始: 从 localStorage 读取数据 ***
+             try {
+                 const dataString = localStorage.getItem('spcData');
+                 const uslString = localStorage.getItem('spcUSL');
+                 const lslString = localStorage.getItem('spcLSL');
+                 // const analysisType = localStorage.getItem('spcAnalysisType'); // 可选读取
 
+                 if (dataString) {
+                     rawData = JSON.parse(dataString);
+                     // X-R 数据应该是二维数组，可以加个简单验证
+                     if (!Array.isArray(rawData) || (rawData.length > 0 && !Array.isArray(rawData[0]))) {
+                         throw new Error("从 localStorage 加载的数据格式不正确，应为二维数组。");
+                     }
+                 } else {
+                      throw new Error("localStorage 中未找到'spcData'。");
+                 }
+
+                 // 解析 USL/LSL
+                 USL = (uslString && uslString !== 'null') ? parseFloat(JSON.parse(uslString)) : null;
+                 LSL = (lslString && lslString !== 'null') ? parseFloat(JSON.parse(lslString)) : null;
+
+                 if (isNaN(USL)) USL = null;
+                 if (isNaN(LSL)) LSL = null;
+
+                 // 可选: 清理 localStorage
+                 // localStorage.removeItem('spcData');
+                 // localStorage.removeItem('spcUSL');
+                 // localStorage.removeItem('spcLSL');
+                 // localStorage.removeItem('spcAnalysisType');
+                 // localStorage.removeItem('spcAdditionalData');
+
+                 calculateAndDisplay(); // 使用加载的数据运行分析
+
+             } catch (error) {
+                 console.error("无法从 localStorage 加载或解析数据:", error);
+                   // 复用 I-MR 中的 displayError 函数（如果 X-R 脚本中没有，需要添加）
+                   if (typeof displayError === 'function') {
+                       displayError("错误: 无法加载或解析所需数据 - " + error.message + "。请确保从首页正确导航。");
+                   } else {
+                       // 简易错误处理
+                       const errorDiv = document.getElementById('error-container') || document.body.appendChild(document.createElement('div'));
+                       errorDiv.className = 'error-message';
+                       errorDiv.textContent = "错误: 无法加载或解析所需数据 - " + error.message + "。请确保从首页正确导航。";
+                       errorDiv.style.display = 'block';
+                   }
+                   return;
+             }
+             // *** 修改结束 ***
+
+
+             // --- Tab 和 Resize Logic (保持不变) ---
             const btnXbar = document.getElementById('btn-xbar');
             const btnR = document.getElementById('btn-r');
             const xbarSection = document.getElementById('xbar-chart-section');
@@ -704,7 +722,6 @@ function initializeCharts(indices, xData, rData, xCL, xUCL, xLCL, rCL, rUCL, rLC
                 console.error("Tab button or section elements not found!");
             }
 
-            // Resize charts on window resize
             window.addEventListener('resize', () => {
                  if (window.currentCharts?.xbar && !xbarSection.classList.contains('hidden')) {
                     window.currentCharts.xbar.resize();
@@ -714,7 +731,6 @@ function initializeCharts(indices, xData, rData, xCL, xUCL, xLCL, rCL, rUCL, rLC
                  }
             });
          }); // End of DOMContentLoaded listener
-
     </script>
 
 </body>
