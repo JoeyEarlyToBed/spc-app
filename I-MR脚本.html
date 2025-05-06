@@ -7,6 +7,15 @@
     <title>个体值-移动极差 (I-MR) 控制图分析</title>
     <script src="echarts.min.js"></script>
     <script src="spc-utils.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+            inlineMath: [['$', '$'], ['\\(', '\\)']]
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="tex-svg.js"> </script>
     <style>
         /* CSS (保持不变) */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; padding: 20px; background-color: #f8f9fa; color: #333; line-height: 1.6; }
@@ -35,6 +44,17 @@
         .rules-card ul { list-style-type: none; padding-left: 0; margin-top: 10px;}
         .rules-card li { margin-bottom: 5px; border-bottom: 1px dashed #eee; padding-bottom: 5px; }
         .rules-card li strong { color: #b45309; }
+        .rules-card li p.rules-card-meaning {
+            margin-top: 4px;
+            margin-bottom: 8px;
+            padding-left: 15px;
+            font-size: 0.85em;
+            color: #555;
+        }
+        .rules-card li p.rules-card-meaning em {
+            font-weight: bold;
+            margin-right: 5px;
+        }
         .error-message { color: red; font-weight: bold; margin-top: 1rem; background-color: #fff5f5; border: 1px solid #fc8181; padding: 0.8rem; border-radius: 4px; }
         .hidden { display: none !important; }
     </style>
@@ -88,7 +108,43 @@
           <div id="stability-summary" class="stability-summary">
               <p><strong>过程稳定性分析:</strong> <span id="stability-analysis"></span></p><div id="violations-list"></div><p style="margin-top: 1rem;"><strong>过程能力分析 (基于 MR̄/d₂):</strong> <span id="capability-analysis-mrbar"></span></p><p><strong>过程性能分析 (基于 s):</strong> <span id="performance-analysis"></span></p><p style="margin-top: 1rem;"><strong>控制图解释:</strong> <span id="interpretation"></span></p>
           </div>
-         <details class="rules-card" style="margin-top: 20px;"><summary>查看控制图判异规则 (8项)</summary><ul><li><strong>规则 1:</strong> 1 点落在 ±3 标准差 (σ) 控制限之外 (A 区之外)。</li><li><strong>规则 2:</strong> 连续 9 点落在中心线 (CL) 的同一侧。</li><li><strong>规则 3:</strong> 连续 6 点递增或递减。</li><li><strong>规则 4:</strong> 连续 14 点相邻点上下交替波动。</li><li><strong>规则 5:</strong> 连续 3 点中有 2 点落在中心线同一侧的 ±2σ 之外 (A 区或之外)。</li><li><strong>规则 6:</strong> 连续 5 点中有 4 点落在中心线同一侧的 ±1σ 之外 (B 区或之外)。</li><li><strong>规则 7:</strong> 连续 15 点落在中心线 ±1σ 之内 (C 区)。</li><li><strong>规则 8:</strong> 连续 8 点落在中心线两侧，但无点落在 ±1σ 之内 (C 区)。</li></ul></details>
+          <details class="rules-card">
+            <summary>查看控制图判异规则 (8项)</summary>
+            <ul>
+                <li>
+                    <strong>规则 1: 1 点落在 A 区之外 (即 > CL + 3$\sigma$ 或 < CL - 3$\sigma$)</strong>
+                    <p class="rules-card-meaning"><em>意义：</em>可能表示存在单个极端异常事件，如设备故障、测量错误、原材料突变等。</p>
+                </li>
+                <li>
+                    <strong>规则 2: 连续 9 点落在中心线 (CL) 同一侧</strong>
+                    <p class="rules-card-meaning"><em>意义：</em>强烈暗示过程均值已发生偏移，可能由操作员更换、设备设定微调、环境温湿度变化等引起。</p>
+                </li>
+                <li>
+                    <strong>规则 3: 连续 6 点递增或递减</strong>
+                    <p class="rules-card-meaning"><em>意义：</em>表明过程存在持续性的漂移或趋势，常见于工具磨损、设备老化、人员技能逐渐变化等。</p>
+                </li>
+                <li>
+                    <strong>规则 4: 连续 14 点相邻点上下交替波动 ↑↓↑↓↑↓↑</strong>
+                    <p class="rules-card-meaning"><em>意义：</em>通常指示过程中存在系统性的交替影响因素，或数据分层不足，如不同设备/操作员交替作业。</p>
+                </li>
+                 <li>
+                     <strong>规则 5: 连续 3 点中有 2 点落在中心线同一侧的 A 区或之外 (即 > CL+2$\sigma$ 或 < CL-2$\sigma$)</strong>
+                     <p class="rules-card-meaning"><em>意义：</em>过程出现较大偏移的早期预警信号，比规则 1 更灵敏地捕捉到显著变化, 异常原因常见于设备参数设置错误、原材料特性突变、测量系统偏差。</p>
+                 </li>
+                 <li>
+                     <strong>规则 6: 连续 5 点中有 4 点落在中心线同一侧的 B 区或之外 (即 > CL+1$\sigma$ 或 < CL-1$\sigma$)</strong>
+                     <p class="rules-card-meaning"><em>意义：</em>过程出现轻微但持续偏移的信号，可能由环境小幅波动、设备轻微异常引起。</p>
+                 </li>
+                 <li>
+                     <strong>规则 7: 连续 15 点落在中心线 C 区之内 (即 CL±1$\sigma$ 之间)</strong>
+                     <p class="rules-card-meaning"><em>意义：</em>表明过程变异可能减小，但也可能提示数据分层不当（如仅选取特定批次）、测量系统精度不足或数据伪造。</p>
+                 </li>
+                 <li>
+                     <strong>规则 8: 连续 8 点落在中心线两侧，但无一在 C 区内 (即 CL±1$\sigma$ 内)</strong>
+                     <p class="rules-card-meaning"><em>意义：</em>暗示过程中可能存在两种或多种不同的分布混合，如使用了特性不同的两批原材料、两台设备，测量系统未校准。</p>
+                 </li>
+            </ul>
+        </details>
       </div>
 
     <script>

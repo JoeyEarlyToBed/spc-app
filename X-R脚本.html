@@ -40,11 +40,24 @@
         td:nth-child(4) { font-style: italic; color: #718096; } /* Evaluation */
         .stability-summary ul { margin-top: 0.5rem; padding-left: 20px; list-style-type: disc; }
         .stability-summary li { margin-bottom: 0.3rem; }
+        .conclusion-details ul { margin-top: 0.5rem; padding-left: 20px; list-style-type: circle; font-size: 0.85rem; color: #4a5568;}
+        .conclusion-details li { margin-bottom: 0.2rem; }
         .rules-card { background-color: #fffcf5; border-color: #fde68a; margin-top: 20px; }
         .rules-card summary { font-weight: 600; cursor: pointer; color: #92400e; }
         .rules-card ul { list-style-type: none; padding-left: 0; margin-top: 10px;}
         .rules-card li { margin-bottom: 5px; border-bottom: 1px dashed #eee; padding-bottom: 5px; }
         .rules-card li strong { color: #b45309; }
+        .rules-card li p.rules-card-meaning {
+            margin-top: 4px;
+            margin-bottom: 8px;
+            padding-left: 15px;
+            font-size: 0.85em;
+            color: #555;
+        }
+        .rules-card li p.rules-card-meaning em {
+            font-weight: bold;
+            margin-right: 5px;
+        }
         .error-message { color: red; font-weight: bold; margin-top: 1rem; background-color: #fff5f5; border: 1px solid #fc8181; padding: 0.8rem; border-radius: 4px; }
         .hidden { display: none !important; }
     </style>
@@ -58,21 +71,21 @@
         <h2>基本统计信息</h2>
         <div class="stats-grid">
             <div>
-                <p><strong>子组大小 (n):</strong> <span id="subgroupSizeN"></span></p>
-                <p><strong>子组数量 (k):</strong> <span id="subgroupCountK"></span></p>
-                <p><strong>Xbar 均值 (X̿):</strong> <span id="xbarBar"></span></p>
-                <p><strong>R 均值 (R̄):</strong> <span id="rBar"></span></p>
+                <p><strong>子组大小 (n):</strong> <span id="subgroupSizeN">N/A</span></p>
+                <p><strong>子组数量 (k):</strong> <span id="subgroupCountK">N/A</span></p>
+                <p><strong>Xbar 均值 (X̿):</strong> <span id="xbarBar">N/A</span></p>
+                <p><strong>R 均值 (R̄):</strong> <span id="rBar">N/A</span></p>
             </div>
             <div>
-                <p><strong>规格上限 (USL):</strong> <span id="usl"></span></p>
-                <p><strong>规格下限 (LSL):</strong> <span id="lsl"></span></p>
-                <p><strong>过程标准差估计 (σ̂ = R̄/d₂):</strong> <span id="sigmaRbar"></span></p>
-                <p><strong>整体样本标准差 (s):</strong> <span id="sampleStdDevS"></span></p>
-                <p><strong>过程标准差估计 (σ̂ = s/c₄):</strong> <span id="sigmaS"></span></p>
+                <p><strong>规格上限 (USL):</strong> <span id="usl">N/A</span></p>
+                <p><strong>规格下限 (LSL):</strong> <span id="lsl">N/A</span></p>
+                <p><strong>过程标准差估计 (σ̂ = R̄/d₂):</strong> <span id="sigmaRbar">N/A</span></p>
+                <p><strong>整体样本标准差 (s):</strong> <span id="sampleStdDevS">N/A</span></p>
+                <p><strong>过程标准差估计 (σ̂ = s/c₄):</strong> <span id="sigmaS">N/A</span></p>
             </div>
         </div>
          <div style="margin-top: 1rem; font-size: 0.9rem; color: #4a5568;">
-            <p><strong>控制图常数:</strong> A₂=<span id="constA2"></span>, D₃=<span id="constD3"></span>, D₄=<span id="constD4"></span>, d₂=<span id="constd2"></span>, c₄=<span id="constc4"></span></p>
+            <p><strong>控制图常数:</strong> A₂=<span id="constA2">N/A</span>, D₃=<span id="constD3">N/A</span>, D₄=<span id="constD4">N/A</span>, d₂=<span id="constd2">N/A</span>, c₄=<span id="constc4">N/A</span></p>
         </div>
     </div>
 
@@ -80,19 +93,18 @@
          <h2>正态性检验 (基于所有个体数据点)</h2>
          <div id="normality-chart-container" class="chart-container"></div>
          <div id="normality-info" class="normality-info">
-              <p><strong>偏度 (Skewness):</strong> <span id="skewness"></span></p>
-              <p><strong>峰度 (Kurtosis):</strong> <span id="kurtosis"></span></p>
-              <p><strong>结论:</strong> <span id="normality-conclusion"></span></p>
+              <p><strong>偏度 (Skewness):</strong> <span id="skewness">N/A</span></p>
+              <p><strong>峰度 (Kurtosis):</strong> <span id="kurtosis">N/A</span></p>
+              <p><strong>结论:</strong> <span id="normality-conclusion">N/A</span></p>
          </div>
          <div class="normality-explanation">
-            <p><strong>图表说明:</strong></p>
+             <p><strong>图表说明:</strong></p>
             <ul>
-                <li><strong>直方图 (柱状):</strong> 显示输入的所有个体数据点的频数分布情况。其分箱数量 $k$ 是依据 Sturges' 规则估算得出 ($k \approx 1 + 3.322 \log_{10} N$, N 为数据点总数)，这有助于观察数据的集中趋势和离散程度。</li>
-                <li><strong>正态曲线 (光滑曲线):</strong> 根据样本均值 ($X̿$) 和样本标准差 ($s$) 绘制的理论正态分布概率密度曲线 (PDF)。用于和直方图进行形状对比，判断数据是否近似正态分布。</li>
+                <li><strong>直方图:</strong> 所有个体数据点的频数分布情况。分箱数量 $k$ 是依据 Sturges' 规则估算得出 ($k \approx 1 + 3.322 \log_{10} N$, N 为数据点总数)，观察数据的集中趋势和离散程度。</li>
+                <li><strong>正态曲线:</strong> 根据样本均值 ($X̿$) 和样本标准差 ($s$) 绘制的理论正态分布概率密度曲线 (PDF)。和直方图进行形状对比，判断数据是否近似正态分布。</li>
                 <li><strong>偏度 (Skewness):</strong> 衡量数据分布的不对称性。0 表示完全对称；正值表示右偏（尾部拖向右侧）；负值表示左偏（尾部拖向左侧）。</li>
                 <li><strong>峰度 (Kurtosis):</strong> 衡量数据分布峰值的尖峭或平坦程度（与正态分布相比）。0 表示正态峰；正值表示尖峰厚尾；负值表示平峰薄尾。</li>
                 <li><strong>结论:</strong> 基于偏度和峰度给出的定性判断。通常认为绝对值小于 1 时数据接近正态分布。</li>
-                <li><strong>规格线 (USL/LSL):</strong> 如果在首页输入了上下规格限，会以绿色虚线标示在图上，帮助直观判断数据分布与公差范围的关系。</li>
                 <li><strong>重要性:</strong> 许多统计过程控制工具（特别是过程能力指数 $C_p/C_{pk}$）都基于数据服从正态分布的假设。如果数据显著偏离正态分布，其计算结果的有效性会打折扣，需要谨慎解读或采用其他分析方法。</li>
             </ul>
          </div>
@@ -104,12 +116,13 @@
             <h3>Xbar 控制图 (基于 R̄)</h3>
             <div id="xbar-chart-container" class="chart-container"></div>
             <div class="limits-info">
-                <p><strong>中心线 (CL = X̿):</strong> <span id="xbarCL"></span></p>
-                <p><strong>上控制限 (UCL = X̿ + A₂R̄):</strong> <span id="xbarUCL"></span></p>
-                <p><strong>下控制限 (LCL = X̿ - A₂R̄):</strong> <span id="xbarLCL"></span></p>
-                <p><strong>+2σ<sub style='font-size:0.7em;'>x̄</sub>:</strong> <span id="xbarUCL2Sigma"></span></p>
-                <p><strong>+1σ<sub style='font-size:0.7em;'>x̄</sub>:</strong> <span id="xbarUCL1Sigma"></span></p>
-                <p><strong>-1σ<sub style='font-size:0.7em;'>x̄</sub>:</strong> <span id="xbarLCL1Sigma"></span></p> <p><strong>-2σ<sub style='font-size:0.7em;'>x̄</sub>:</strong> <span id="xbarLCL2Sigma"></span></p>
+                <p><strong>中心线 (CL = X̿):</strong> <span id="xbarCL">N/A</span></p>
+                <p><strong>上控制限 (UCL = X̿ + A₂R̄):</strong> <span id="xbarUCL">N/A</span></p>
+                <p><strong>下控制限 (LCL = X̿ - A₂R̄):</strong> <span id="xbarLCL">N/A</span></p>
+                <p><strong>+2σ<sub style='font-size:0.7em;'>x̄</sub>:</strong> <span id="xbarUCL2Sigma">N/A</span></p>
+                <p><strong>+1σ<sub style='font-size:0.7em;'>x̄</sub>:</strong> <span id="xbarUCL1Sigma">N/A</span></p>
+                <p><strong>-1σ<sub style='font-size:0.7em;'>x̄</sub>:</strong> <span id="xbarLCL1Sigma">N/A</span></p>
+                <p><strong>-2σ<sub style='font-size:0.7em;'>x̄</sub>:</strong> <span id="xbarLCL2Sigma">N/A</span></p>
             </div>
         </div>
         <hr style="margin: 2rem 0; border: none; border-top: 1px solid #eee;">
@@ -117,9 +130,9 @@
             <h3>R 控制图</h3>
             <div id="r-chart-container" class="chart-container"></div>
             <div class="limits-info">
-                <p><strong>中心线 (CL = R̄):</strong> <span id="rCL"></span></p>
-                <p><strong>上控制限 (UCL = D₄R̄):</strong> <span id="rUCL"></span></p>
-                <p><strong>下控制限 (LCL = D₃R̄):</strong> <span id="rLCL"></span></p>
+                <p><strong>中心线 (CL = R̄):</strong> <span id="rCL">N/A</span></p>
+                <p><strong>上控制限 (UCL = D₄R̄):</strong> <span id="rUCL">N/A</span></p>
+                <p><strong>下控制限 (LCL = D₃R̄):</strong> <span id="rLCL">N/A</span></p>
             </div>
         </div>
      </div>
@@ -139,38 +152,38 @@
                 <tr>
                     <td>Cp</td>
                     <td>σ̂ = R̄/d₂</td>
-                    <td id="cp-rbar-val"></td>
-                    <td id="cp-rbar-eval"></td>
+                    <td id="cp-rbar-val">N/A</td>
+                    <td id="cp-rbar-eval">N/A</td>
                 </tr>
                 <tr>
                     <td>Cpk</td>
                     <td>σ̂ = R̄/d₂</td>
-                    <td id="cpk-rbar-val"></td>
-                    <td id="cpk-rbar-eval"></td>
+                    <td id="cpk-rbar-val">N/A</td>
+                    <td id="cpk-rbar-eval">N/A</td>
                 </tr>
                  <tr>
                     <td>Cp (基于s)</td>
                     <td>σ̂ = s/c₄</td>
-                    <td id="cp-s-val"></td>
-                    <td id="cp-s-eval"></td>
+                    <td id="cp-s-val">N/A</td>
+                    <td id="cp-s-eval">N/A</td>
                 </tr>
                 <tr>
                     <td>Cpk (基于s)</td>
                     <td>σ̂ = s/c₄</td>
-                    <td id="cpk-s-val"></td>
-                    <td id="cpk-s-eval"></td>
+                    <td id="cpk-s-val">N/A</td>
+                    <td id="cpk-s-eval">N/A</td>
                 </tr>
                  <tr>
                     <td>Pp</td>
                      <td>s (整体样本标准差)</td>
-                    <td id="pp-val"></td>
-                    <td id="pp-eval"></td>
+                    <td id="pp-val">N/A</td>
+                    <td id="pp-eval">N/A</td>
                 </tr>
                 <tr>
                     <td>Ppk</td>
                      <td>s (整体样本标准差)</td>
-                    <td id="ppk-val"></td>
-                    <td id="ppk-eval"></td>
+                    <td id="ppk-val">N/A</td>
+                    <td id="ppk-eval">N/A</td>
                 </tr>
             </tbody>
         </table>
@@ -188,25 +201,60 @@
 
     <div class="container-section">
         <h2>过程分析结论</h2>
-        <div id="stability-summary" class="stability-summary">
-            <p><strong>正态性分析:</strong> <span id="normality-analysis-result"></span></p>
-            <p><strong>过程稳定性分析:</strong> <span id="stability-analysis"></span></p>
-            <div id="violations-list"></div> <p style="margin-top: 1rem;"><strong>过程能力分析 (基于 R̄/d₂):</strong> <span id="capability-analysis-rbar"></span></p>
-             <p><strong>过程能力分析 (基于 s/c₄):</strong> <span id="capability-analysis-s"></span></p>
-            <p><strong>过程性能分析 (基于 s):</strong> <span id="performance-analysis"></span></p>
-             <p style="margin-top: 1rem;"><strong>控制图解释:</strong> <span id="interpretation"></span></p>
+        <div id="stability-summary" class="stability-summary conclusion-details">
+             <p><strong>正态性分析:</strong> <span id="normality-analysis-result">N/A</span></p>
+            <ul>
+                <li>检验方法: 基于所有个体数据点的偏度 (Skewness) 和峰度 (Kurtosis) 进行启发式判断。</li>
+                <li>判断规则:
+                    <ul>
+                        <li>$|Skewness| < 0.5$ 且 $|Kurtosis| < 0.5$: 接近正态。</li>
+                        <li>$0.5 \le |Skewness| < 1$ 且 $0.5 \le |Kurtosis| < 1$: 轻微偏离。</li>
+                        <li>$|Skewness| \ge 1$ 或 $|Kurtosis| \ge 1$: 显著偏离。</li>
+                    </ul>
+                </li>
+                 <li>注意：此为描述性检验，非严格统计检验。显著偏离正态会影响 $C_p/C_{pk}$ 结果的有效性。</li>
+            </ul>
+            <p><strong>过程稳定性分析:</strong> <span id="stability-analysis">N/A</span></p>
+            <div id="violations-list"></div> <p style="margin-top: 1rem;"><strong>过程能力分析 (基于 R̄/d₂):</strong> <span id="capability-analysis-rbar">N/A</span></p>
+             <p><strong>过程能力分析 (基于 s/c₄):</strong> <span id="capability-analysis-s">N/A</span></p>
+            <p><strong>过程性能分析 (基于 s):</strong> <span id="performance-analysis">N/A</span></p>
+             <p style="margin-top: 1rem;"><strong>控制图解释:</strong> <span id="interpretation">N/A</span></p>
         </div>
-         <details class="rules-card">
+        <details class="rules-card">
             <summary>查看控制图判异规则 (8项)</summary>
             <ul>
-                <li><strong>规则 1:</strong> 1 点落在 ±3 标准差 (σ<sub style='font-size:0.7em;'>x̄</sub>) 控制限之外 (A 区之外)。</li>
-                <li><strong>规则 2:</strong> 连续 9 点落在中心线 (CL) 的同一侧。</li>
-                <li><strong>规则 3:</strong> 连续 6 点递增或递减。</li>
-                <li><strong>规则 4:</strong> 连续 14 点相邻点上下交替波动。</li>
-                <li><strong>规则 5:</strong> 连续 3 点中有 2 点落在中心线同一侧的 ±2σ<sub style='font-size:0.7em;'>x̄</sub> 之外 (A 区或之外)。</li>
-                <li><strong>规则 6:</strong> 连续 5 点中有 4 点落在中心线同一侧的 ±1σ<sub style='font-size:0.7em;'>x̄</sub> 之外 (B 区或之外)。</li>
-                <li><strong>规则 7:</strong> 连续 15 点落在中心线 ±1σ<sub style='font-size:0.7em;'>x̄</sub> 之内 (C 区)。</li>
-                <li><strong>规则 8:</strong> 连续 8 点落在中心线两侧，但无点落在 ±1σ<sub style='font-size:0.7em;'>x̄</sub> 之内 (C 区)。</li>
+                <li>
+                    <strong>规则 1: 1 点落在 A 区之外 (即 > CL + 3$\sigma$ 或 < CL - 3$\sigma$)</strong>
+                    <p class="rules-card-meaning"><em>意义：</em>可能表示存在单个极端异常事件，如设备故障、测量错误、原材料突变等。</p>
+                </li>
+                <li>
+                    <strong>规则 2: 连续 9 点落在中心线 (CL) 同一侧</strong>
+                    <p class="rules-card-meaning"><em>意义：</em>强烈暗示过程均值已发生偏移，可能由操作员更换、设备设定微调、环境温湿度变化等引起。</p>
+                </li>
+                <li>
+                    <strong>规则 3: 连续 6 点递增或递减</strong>
+                    <p class="rules-card-meaning"><em>意义：</em>表明过程存在持续性的漂移或趋势，常见于工具磨损、设备老化、人员技能逐渐变化等。</p>
+                </li>
+                <li>
+                    <strong>规则 4: 连续 14 点相邻点上下交替波动 ↑↓↑↓↑↓↑</strong>
+                    <p class="rules-card-meaning"><em>意义：</em>通常指示过程中存在系统性的交替影响因素，或数据分层不足，如不同设备/操作员交替作业。</p>
+                </li>
+                 <li>
+                     <strong>规则 5: 连续 3 点中有 2 点落在中心线同一侧的 A 区或之外 (即 > CL+2$\sigma$ 或 < CL-2$\sigma$)</strong>
+                     <p class="rules-card-meaning"><em>意义：</em>过程出现较大偏移的早期预警信号，比规则 1 更灵敏地捕捉到显著变化, 异常原因常见于设备参数设置错误、原材料特性突变、测量系统偏差。</p>
+                 </li>
+                 <li>
+                     <strong>规则 6: 连续 5 点中有 4 点落在中心线同一侧的 B 区或之外 (即 > CL+1$\sigma$ 或 < CL-1$\sigma$)</strong>
+                     <p class="rules-card-meaning"><em>意义：</em>过程出现轻微但持续偏移的信号，可能由环境小幅波动、设备轻微异常引起。</p>
+                 </li>
+                 <li>
+                     <strong>规则 7: 连续 15 点落在中心线 C 区之内 (即 CL±1$\sigma$ 之间)</strong>
+                     <p class="rules-card-meaning"><em>意义：</em>表明过程变异可能减小，但也可能提示数据分层不当（如仅选取特定批次）、测量系统精度不足或数据伪造。</p>
+                 </li>
+                 <li>
+                     <strong>规则 8: 连续 8 点落在中心线两侧，但无一在 C 区内 (即 CL±1$\sigma$ 内)</strong>
+                     <p class="rules-card-meaning"><em>意义：</em>暗示过程中可能存在两种或多种不同的分布混合，如使用了特性不同的两批原材料、两台设备，测量系统未校准。</p>
+                 </li>
             </ul>
         </details>
     </div>
@@ -219,6 +267,25 @@
         let xbarValues = [];
         let rValues = [];
         let allDataPoints = []; // Flattened 1D array for normality test
+
+        // *** 新增: 辅助函数，用于安全更新DOM ***
+        function safeSetText(id, value) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+            } else {
+                console.warn(`Element with ID '${id}' not found.`);
+            }
+        }
+        function safeSetHTML(id, value) {
+             const element = document.getElementById(id);
+             if (element) {
+                 element.innerHTML = value;
+             } else {
+                 console.warn(`Element with ID '${id}' not found.`);
+             }
+        }
+        // *** 辅助函数结束 ***
 
         // --- 主计算逻辑 ---
         function calculateAndDisplay() {
@@ -309,59 +376,57 @@
                 const Ppk = Math.min(PpU, PpL);
 
 
-                // --- 更新HTML显示统计信息 ---
-                document.getElementById('subgroupSizeN').textContent = n;
-                document.getElementById('subgroupCountK').textContent = k;
-                document.getElementById('xbarBar').textContent = formatNum(xbarBar);
-                document.getElementById('rBar').textContent = formatNum(rBar);
-                document.getElementById('sigmaRbar').textContent = formatNum(sigmaHat_Rbar);
-                document.getElementById('sampleStdDevS').textContent = formatNum(overallStdDevS);
-                 document.getElementById('sigmaS').textContent = formatNum(sigmaHat_S);
-                document.getElementById('usl').textContent = USL === null ? '未指定' : formatNum(USL);
-                document.getElementById('lsl').textContent = LSL === null ? '未指定' : formatNum(LSL);
+                // --- 更新HTML显示统计信息 (使用 safeSetText) ---
+                safeSetText('subgroupSizeN', n);
+                safeSetText('subgroupCountK', k);
+                safeSetText('xbarBar', formatNum(xbarBar));
+                safeSetText('rBar', formatNum(rBar));
+                safeSetText('sigmaRbar', formatNum(sigmaHat_Rbar));
+                safeSetText('sampleStdDevS', formatNum(overallStdDevS));
+                safeSetText('sigmaS', formatNum(sigmaHat_S));
+                safeSetText('usl', USL === null ? '未指定' : formatNum(USL));
+                safeSetText('lsl', LSL === null ? '未指定' : formatNum(LSL));
                 // Update constants display
-                document.getElementById('constA2').textContent = A2.toFixed(3);
-                document.getElementById('constD3').textContent = D3.toFixed(3);
-                document.getElementById('constD4').textContent = D4.toFixed(3);
-                document.getElementById('constd2').textContent = d2.toFixed(3);
-                document.getElementById('constc4').textContent = c4.toFixed(3);
+                safeSetText('constA2', A2.toFixed(3));
+                safeSetText('constD3', D3.toFixed(3));
+                safeSetText('constD4', D4.toFixed(3));
+                safeSetText('constd2', d2.toFixed(3));
+                safeSetText('constc4', c4.toFixed(3));
                 // Update control limit info displays
-                document.getElementById('xbarCL').textContent = formatNum(xbarBar);
-                document.getElementById('xbarUCL').textContent = formatNum(xUCL);
-                document.getElementById('xbarLCL').textContent = formatNum(xLCL);
-                 document.getElementById('xbarUCL2Sigma').textContent = formatNum(xUCL2Sigma);
-                 document.getElementById('xbarLCL2Sigma').textContent = formatNum(xLCL2Sigma);
-                 document.getElementById('xbarUCL1Sigma').textContent = formatNum(xUCL1Sigma);
-                 // **FIXED ID HERE**
-                 document.getElementById('xbarLCL1Sigma').textContent = formatNum(xLCL1Sigma);
-                document.getElementById('rCL').textContent = formatNum(rBar);
-                document.getElementById('rUCL').textContent = formatNum(rUCL);
-                document.getElementById('rLCL').textContent = formatNum(rLCL);
+                safeSetText('xbarCL', formatNum(xbarBar));
+                safeSetText('xbarUCL', formatNum(xUCL));
+                safeSetText('xbarLCL', formatNum(xLCL));
+                safeSetText('xbarUCL2Sigma', formatNum(xUCL2Sigma));
+                safeSetText('xbarLCL2Sigma', formatNum(xLCL2Sigma));
+                safeSetText('xbarUCL1Sigma', formatNum(xUCL1Sigma));
+                safeSetText('xbarLCL1Sigma', formatNum(xLCL1Sigma));
+                safeSetText('rCL', formatNum(rBar));
+                safeSetText('rUCL', formatNum(rUCL));
+                safeSetText('rLCL', formatNum(rLCL));
 
-                // --- 更新过程能力/性能表格 ---
-                document.getElementById('cp-rbar-val').textContent = formatIndex(Cp_Rbar);
-                document.getElementById('cp-rbar-eval').textContent = getEvaluation(Cp_Rbar);
-                document.getElementById('cpk-rbar-val').textContent = formatIndex(Cpk_Rbar);
-                document.getElementById('cpk-rbar-eval').textContent = getEvaluation(Cpk_Rbar);
-                 document.getElementById('cp-s-val').textContent = formatIndex(Cp_S);
-                document.getElementById('cp-s-eval').textContent = getEvaluation(Cp_S);
-                document.getElementById('cpk-s-val').textContent = formatIndex(Cpk_S);
-                document.getElementById('cpk-s-eval').textContent = getEvaluation(Cpk_S);
-                document.getElementById('pp-val').textContent = formatIndex(Pp);
-                document.getElementById('pp-eval').textContent = getEvaluation(Pp);
-                document.getElementById('ppk-val').textContent = formatIndex(Ppk);
-                document.getElementById('ppk-eval').textContent = getEvaluation(Ppk);
+                // --- 更新过程能力/性能表格 (使用 safeSetText) ---
+                safeSetText('cp-rbar-val', formatIndex(Cp_Rbar));
+                safeSetText('cp-rbar-eval', getEvaluation(Cp_Rbar));
+                safeSetText('cpk-rbar-val', formatIndex(Cpk_Rbar));
+                safeSetText('cpk-rbar-eval', getEvaluation(Cpk_Rbar));
+                safeSetText('cp-s-val', formatIndex(Cp_S));
+                safeSetText('cp-s-eval', getEvaluation(Cp_S));
+                safeSetText('cpk-s-val', formatIndex(Cpk_S));
+                safeSetText('cpk-s-eval', getEvaluation(Cpk_S));
+                safeSetText('pp-val', formatIndex(Pp));
+                safeSetText('pp-eval', getEvaluation(Pp));
+                safeSetText('ppk-val', formatIndex(Ppk));
+                safeSetText('ppk-eval', getEvaluation(Ppk));
 
 
                  // --- 正态性检验 ---
                  const numBins = sturgesRuleBins(allDataPoints);
                  const histData = histogramData(allDataPoints, numBins);
-                 // 使用整体样本标准差 s 进行正态曲线绘制
                  const curveData = generateNormalCurveData(allDataPoints, xbarBar, overallStdDevS); // Use overallStdDevS for curve
                  const skew = skewness(allDataPoints);
                  const kurt = kurtosis(allDataPoints);
-                 document.getElementById('skewness').textContent = formatIndex(skew, 3);
-                 document.getElementById('kurtosis').textContent = formatIndex(kurt, 3);
+                 safeSetText('skewness', formatIndex(skew, 3));
+                 safeSetText('kurtosis', formatIndex(kurt, 3));
                  let normalityConclusionText = "数据分布形态: ";
                  if (isNaN(skew) || isNaN(kurt)) {
                      normalityConclusionText += "<span style='color:grey'>数据不足或无变异，无法判断</span>";
@@ -372,22 +437,21 @@
                  } else {
                       normalityConclusionText += "<span style='color:red'>显著偏离正态</span> (可能影响过程能力指数 Cp/Cpk 的准确性)";
                  }
-                 document.getElementById('normality-conclusion').innerHTML = normalityConclusionText;
-                 document.getElementById('normality-analysis-result').innerHTML = normalityConclusionText; // Also update summary
+                 safeSetHTML('normality-conclusion', normalityConclusionText); // 使用 safeSetHTML
+                 safeSetHTML('normality-analysis-result', normalityConclusionText); // 使用 safeSetHTML
 
 
                  // --- 过程稳定性分析 (Sigma Rules on Xbar Chart) ---
-                 // 使用 sigmaXbar (Xbar的标准差估计 = sigmaRbar / sqrt(n)) 进行规则检查
                  const ruleCheckResult = checkControlChartRules(xbarValues, xbarBar, sigmaXbar);
                  const violations = ruleCheckResult.violations;
                  const ruleDescriptions = ruleCheckResult.descriptions;
                  const xPointsViolatingRulesIndices = [...new Set(Object.values(violations).flat())].sort((a, b) => a - b);
-                 let rPointsOutOfControlIndices = rValues.reduce((acc, val, index) => { if (val > rUCL || (rLCL > 0 && val < rLCL)) acc.push(index); return acc; }, []); // Correct R LCL check
+                 let rPointsOutOfControlIndices = rValues.reduce((acc, val, index) => { if (val > rUCL || (rLCL > 0 && val < rLCL)) acc.push(index); return acc; }, []);
                  let isXbarStable = xPointsViolatingRulesIndices.length === 0;
                  let isRStable = rPointsOutOfControlIndices.length === 0;
                  let stableMessage = "";
                  const violationsListDiv = document.getElementById('violations-list');
-                 violationsListDiv.innerHTML = ''; // Clear previous list
+                 if (violationsListDiv) violationsListDiv.innerHTML = ''; // Clear previous list
 
                 if (isXbarStable && isRStable) {
                     stableMessage = "从Xbar-R控制图看，所有点都在控制限内，且未检测到明显的西格玛规则违例（见下方规则卡片）。过程初步判断<span style='color:green'>统计稳定</span>。";
@@ -399,7 +463,7 @@
 
                     // Display violated rules
                     const violatedRuleNumbers = Object.keys(violations).map(Number).sort((a, b) => a - b);
-                    if (violatedRuleNumbers.length > 0) {
+                    if (violatedRuleNumbers.length > 0 && violationsListDiv) {
                         const ul = document.createElement('ul');
                         ul.innerHTML = '<p><strong>Xbar 图违反的规则:</strong></p>';
                         violatedRuleNumbers.forEach(ruleNum => {
@@ -412,13 +476,13 @@
                         violationsListDiv.appendChild(ul);
                     }
                  }
-                document.getElementById('stability-analysis').innerHTML = stableMessage;
+                safeSetHTML('stability-analysis', stableMessage); // 使用 safeSetHTML
 
 
                 // --- 更新结论文本 (Capability/Performance) ---
-                 document.getElementById('capability-analysis-rbar').textContent = `基于 R̄/d₂ (σ̂=${formatNum(sigmaHat_Rbar,4)}): Cp=${formatIndex(Cp_Rbar)}, Cpk=${formatIndex(Cpk_Rbar)}. 评价: ${getEvaluation(Cpk_Rbar)}.`;
-                 document.getElementById('capability-analysis-s').textContent = `基于 s/c₄ (σ̂=${formatNum(sigmaHat_S,4)}): Cp=${formatIndex(Cp_S)}, Cpk=${formatIndex(Cpk_S)}. 评价: ${getEvaluation(Cpk_S)}.`;
-                document.getElementById('performance-analysis').textContent = `基于 s (${formatNum(overallStdDevS,4)}): Pp=${formatIndex(Pp)}, Ppk=${formatIndex(Ppk)}. 评价: ${getEvaluation(Ppk)}.`;
+                 safeSetText('capability-analysis-rbar', `基于 R̄/d₂ (σ̂=${formatNum(sigmaHat_Rbar,4)}): Cp=${formatIndex(Cp_Rbar)}, Cpk=${formatIndex(Cpk_Rbar)}. 评价: ${getEvaluation(Cpk_Rbar)}.`);
+                 safeSetText('capability-analysis-s', `基于 s/c₄ (σ̂=${formatNum(sigmaHat_S,4)}): Cp=${formatIndex(Cp_S)}, Cpk=${formatIndex(Cpk_S)}. 评价: ${getEvaluation(Cpk_S)}.`);
+                 safeSetText('performance-analysis', `基于 s (${formatNum(overallStdDevS,4)}): Pp=${formatIndex(Pp)}, Ppk=${formatIndex(Ppk)}. 评价: ${getEvaluation(Ppk)}.`);
 
                 // Overall Interpretation
                 let interpretationText = `Xbar 图监控子组均值的变化，反映过程中心。R 图监控子组极差的变化，反映过程变异的稳定性。`;
@@ -441,7 +505,7 @@
                      interpretationText += ` 过程性能指数 Ppk (基于s) 无法计算 (需要USL和LSL)。`;
                  }
                  interpretationText += ` (注意: 正态性假设对过程能力指数(Cp/Cpk)的解读很重要。${normalityConclusionText.includes("显著偏离") ? '当前数据显著偏离正态，Cp/Cpk结果需谨慎解读。' : normalityConclusionText.includes("无法判断") ? '正态性无法判断。':''})`;
-                 document.getElementById('interpretation').textContent = interpretationText;
+                 safeSetText('interpretation', interpretationText);
 
 
                  // --- ECharts 初始化 ---
