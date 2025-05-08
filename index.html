@@ -72,7 +72,7 @@
                       <h4>数据格式要求</h4>
                       <ul>
                           <li><strong>个体值 (自动选择 I-MR):</strong><ul><li>每行一个数据点，或所有数据点在同一行内用英文逗号 (,) 分隔。</li><li>示例: <code>1.143, 1.138, 1.148</code> 或: <pre>1.143&#10;1.138&#10;1.148</pre></li></ul></li>
-                          <li><strong>子组 (自动选择 X-R/X-S):</strong><ul><li>每行代表一个子组。子组内数据点用英文逗号 (,) 分隔。</li><li><strong>重要:</strong> 所有子组大小 (每行点数) 必须相同。工具会根据子组大小优先选择 X-R (n<9) 或 X-S (n≥9)。</li><li>示例 (n=3): <pre>2.1, 2.2, 2.3&#10;2.0, 2.1, 2.2&#10;1.9, 2.0, 2.1</pre></li></ul></li>
+                          <li><strong>子组 (Xbar-R / Xbar-S):</strong><ul><li>每行代表一个子组。子组内数据点用英文逗号 (,) 分隔。</li><li><strong>重要:</strong> 所有子组大小 (每行点数) 必须相同。</li><li>您可以手动选择生成 Xbar-R 图或 Xbar-S 图。若选择“自动判断”，工具将根据子组大小推荐 (通常 n<9 用 Xbar-R, n≥9 用 Xbar-S)。</li><li>示例 (n=3): <pre>2.1, 2.2, 2.3&#10;2.0, 2.1, 2.2&#10;1.9, 2.0, 2.1</pre></li></ul></li>
                           <li><strong>p/np 图数据:</strong><ul><li>请在下方手动选择图表类型。</li><li>此输入框内应输入每组的 **不合格品数/缺陷数** (每行一组，或单行逗号分隔)。</li><li>示例: <code>3, 2, 5, 1, 4</code> 或: <pre>3&#10;2&#10;5&#10;1&#10;4</pre></li></ul></li>
                           <li>确保输入为数值，勿含单位或文本。</li>
                       </ul>
@@ -87,8 +87,15 @@
              </div>
              <div class="form-section">
                  <label for="chart-type">3. 手动选择控制图类型 (可选):</label>
-                 <select id="chart-type" name="chart-type"><option value="auto" selected>自动判断 (I-MR / Xbar-R / Xbar-S)</option><option value="xs">Xbar-S 图 (均值-标准差图)</option><option value="p">p 图 (不良品率图 - 样本量可变)</option><option value="np">np 图 (不良品数图 - 样本量固定)</option></select>
-                 <span class="tooltip">默认根据数据格式自动选择。如需使用 p 图或 np 图等，请在此手动选择，并按提示填写下方所需信息。</span>
+                 <select id="chart-type" name="chart-type">
+                     <option value="auto" selected>自动判断 (I-MR / Xbar-R / Xbar-S)</option>
+                     <option value="imr">I-MR 图 (个体值-移动极差图)</option>
+                     <option value="xr">Xbar-R 图 (均值-极差图)</option>
+                     <option value="xs">Xbar-S 图 (均值-标准差图)</option>
+                     <option value="p">p 图 (不良品率图 - 样本量可变)</option>
+                     <option value="np">np 图 (不良品数图 - 样本量固定)</option>
+                 </select>
+                 <span class="tooltip">默认根据数据格式自动选择。Xbar-R 通常用于子组大小 <9，Xbar-S 用于子组大小 ≥5 或需要更高精度。如需使用 p 图或 np 图等，请在此手动选择。</span>
              </div>
              <div id="conditional-inputs-p" class="conditional-inputs"><label for="p-sample-sizes">为 p 图输入每组对应的样本量:</label><textarea id="p-sample-sizes" name="p-sample-sizes" rows="3" placeholder="每行一个样本量，或单行逗号分隔，需与上方数据行/个数一一对应。&#10;示例: 100, 105, 98, 100, 102"></textarea><span class="tooltip">p 图要求输入每组检查的总数（样本大小），顺序和数量必须与数据输入一致。</span></div>
              <div id="conditional-inputs-np" class="conditional-inputs"><label for="np-sample-size">为 np 图输入固定的子组样本量:</label><input type="number" id="np-sample-size" name="np-sample-size" min="1" step="1" placeholder="输入一个正整数"><span class="tooltip">np 图要求所有子组的样本大小都相同。</span></div>
@@ -129,7 +136,7 @@
             if (dataInput === '') { errorMessageDiv.textContent = '错误: 请输入测量数据。'; return; }
 
             let data;
-            let analysisType;
+            let analysisType; // This will store the final determined chart type (imr, xr, xs, p, np)
             let targetScript;
             let additionalData = {};
 
@@ -145,77 +152,128 @@
                                       .filter(val => val !== '')
                                       .map(val => {
                                           const num = parseFloat(val);
-                                          if (isNaN(num)) throw new Error(`第 ${index + 1} 行包含无效数值: "${val}"`);
+                                          if (isNaN(num)) throw new Error(`数据输入错误：第 ${index + 1} 行的 "${val}" 不是一个有效数值。`);
                                           return num;
                                       });
-                     if (values.length === 0) throw new Error(`第 ${index + 1} 行为空或只包含分隔符。`);
+                     if (values.length === 0 && lines.length === 1 && dataInput.includes(',')) { // Special case for single line comma separated with potential empty last element if trailing comma
+                         // This was already handled by filter(val => val !== '') effectively.
+                         // If after filtering, values.length is still 0, it's an error.
+                     }
+                     if (values.length === 0) throw new Error(`数据输入错误：第 ${index + 1} 行解析后没有有效的数值数据。`);
+
 
                      if (index === 0) {
                          subgroupSize = values.length;
                      } else if (values.length !== subgroupSize) {
-                         isConsistentSize = false; // Mark inconsistency, but don't throw error yet
+                         isConsistentSize = false;
                      }
                      return values;
                  });
 
-                 // --- Refined Chart Type Determination ---
-                 if (selectedChartType === 'auto' || selectedChartType === 'xs') {
-                     // Check for I-MR cases first
-                     const isMultiLineSingleValue = parsedData.length > 1 && subgroupSize === 1 && isConsistentSize;
-                     const isSingleLineMultiValue = parsedData.length === 1 && subgroupSize > 1;
+                 // --- Chart Type Determination Logic ---
+                if (selectedChartType === 'p') {
+                    analysisType = 'p';
+                    if (parsedData.some(arr => arr.length > 1)) throw new Error("p 图数据格式错误：主数据框每行应只包含一个不合格品计数值。");
+                    data = parsedData.map(arr => arr[0]);
+                    if (data.length < 1) throw new Error("p 图至少需要1个数据点。");
 
-                     if (isMultiLineSingleValue || isSingleLineMultiValue) {
-                         analysisType = 'imr';
-                         data = isMultiLineSingleValue ? parsedData.map(arr => arr[0]) : parsedData[0];
-                         if (data.length < 2) throw new Error("I-MR 图至少需要2个数据点。");
-                     }
-                     // Check for X-R/X-S case
-                     else if (parsedData.length >= 2 && subgroupSize >= 2 && isConsistentSize) {
-                         analysisType = (selectedChartType === 'xs' || subgroupSize >= 9) ? 'xs' : 'xr';
-                         data = parsedData;
-                         if (data.length < 2) throw new Error("X-R/X-S 图至少需要2个子组。");
-                     }
-                     // Check for inconsistent subgroup size ONLY if it wasn't identified as I-MR
-                     else if (parsedData.length > 1 && !isConsistentSize) {
-                         throw new Error("子组大小不一致。X-R/X-S 图要求所有子组大小相同。请检查数据或选择适合的图表类型。");
-                     }
-                     // Otherwise, format is likely incorrect or insufficient
-                     else {
-                         throw new Error("无法根据数据格式自动判断图表类型。请检查数据或手动选择图表类型。");
-                     }
+                    const sampleSizesInput = document.getElementById('p-sample-sizes').value.trim();
+                    if (!sampleSizesInput) throw new Error("p 图需要输入对应的样本量。");
+                    const sampleSizes = sampleSizesInput.split(/[\n,]+/).map(s => s.trim()).filter(s => s !== '').map(s => parseInt(s));
+                    if (sampleSizes.some(isNaN) || sampleSizes.some(n => n <= 0)) throw new Error("p 图样本量必须是正整数。");
+                    if (sampleSizes.length !== data.length) throw new Error("p 图样本量个数 (" + sampleSizes.length + ") 必须与数据点/组数 (" + data.length + ") 相同。");
+                    additionalData.sampleSizes = sampleSizes;
 
-                 } else if (selectedChartType === 'p') {
-                     analysisType = 'p';
-                     if (subgroupSize > 1) throw new Error("p 图数据格式错误：主数据框每行应只包含一个不合格品计数值。");
-                     data = parsedData.map(arr => arr[0]);
+                } else if (selectedChartType === 'np') {
+                    analysisType = 'np';
+                    if (parsedData.some(arr => arr.length > 1)) throw new Error("np 图数据格式错误：主数据框每行应只包含一个不合格品计数值。");
+                    data = parsedData.map(arr => arr[0]);
+                    if (data.length < 1) throw new Error("np 图至少需要1个数据点。");
 
-                     const sampleSizesInput = document.getElementById('p-sample-sizes').value.trim();
-                     if (!sampleSizesInput) throw new Error("p 图需要输入对应的样本量。");
-                     const sampleSizes = sampleSizesInput.split(/[\n,]+/).map(s => s.trim()).filter(s => s !== '').map(s => parseInt(s));
-                     if (sampleSizes.some(isNaN) || sampleSizes.some(n => n <= 0)) throw new Error("p 图样本量必须是正整数。");
-                     if (sampleSizes.length !== data.length) throw new Error("p 图样本量个数 (" + sampleSizes.length + ") 必须与数据点/组数 (" + data.length + ") 相同。");
-                     additionalData.sampleSizes = sampleSizes;
+                    const sampleSizeInput = document.getElementById('np-sample-size').value;
+                    if (!sampleSizeInput) throw new Error("np 图需要输入固定的子组样本量。");
+                    const fixedSampleSize = parseInt(sampleSizeInput); // Renamed to avoid conflict
+                    if (isNaN(fixedSampleSize) || fixedSampleSize <= 0) throw new Error("np 图样本量必须是正整数。");
+                    additionalData.sampleSize = fixedSampleSize;
 
-                 } else if (selectedChartType === 'np') {
-                     analysisType = 'np';
-                     if (subgroupSize > 1) throw new Error("np 图数据格式错误：主数据框每行应只包含一个不合格品计数值。");
-                     data = parsedData.map(arr => arr[0]);
+                } else { // Handles 'auto', 'imr', 'xr', 'xs'
+                    const isMultiLineSingleValue = parsedData.length > 1 && subgroupSize === 1 && isConsistentSize;
+                    const isSingleLineMultiValueIndividuals = parsedData.length === 1 && subgroupSize > 1; // Potentially individuals if selectedChartType is 'imr' or 'auto' defaults to it.
 
-                     const sampleSizeInput = document.getElementById('np-sample-size').value;
-                     if (!sampleSizeInput) throw new Error("np 图需要输入固定的子组样本量。");
-                     const sampleSize = parseInt(sampleSizeInput);
-                     if (isNaN(sampleSize) || sampleSize <= 0) throw new Error("np 图样本量必须是正整数。");
-                     additionalData.sampleSize = sampleSize;
-                 }
+                    if (selectedChartType === 'imr') {
+                        if (isMultiLineSingleValue) { // Multiple lines, each is an individual
+                             data = parsedData.map(arr => arr[0]);
+                        } else if (isSingleLineMultiValueIndividuals) { // Single line, all are individuals
+                             data = parsedData[0];
+                        } else if (parsedData.length > 1 && subgroupSize > 1 && isConsistentSize) { // User selected IMR but provided subgroup data
+                            throw new Error("选择了 I-MR 图，但输入的数据看起来是子组数据 (每行多个值)。I-MR 图需要每行单个值或单行逗号分隔的多个值。");
+                        } else if (!isConsistentSize) {
+                            throw new Error("选择了 I-MR 图，但输入的数据行包含不同数量的值。请检查数据格式。");
+                        }
+                        else { // Fallback for other single line cases not fitting perfectly
+                             data = parsedData.flat(); // Flatten in case of any ambiguity, treat as individuals
+                        }
+                        if (data.length < 2) throw new Error("I-MR 图至少需要2个数据点。");
+                        analysisType = 'imr';
+
+                    } else if (selectedChartType === 'xr') {
+                        if (!isConsistentSize) throw new Error("选择了 Xbar-R 图，但子组大小不一致。Xbar-R 图要求所有子组大小相同。");
+                        if (subgroupSize < 2) throw new Error("Xbar-R 图的子组大小 (n) 必须至少为 2。");
+                        if (parsedData.length < 2) throw new Error("Xbar-R 图至少需要 2 个子组。");
+                        data = parsedData;
+                        analysisType = 'xr';
+
+                    } else if (selectedChartType === 'xs') {
+                        if (!isConsistentSize) throw new Error("选择了 Xbar-S 图，但子组大小不一致。Xbar-S 图要求所有子组大小相同。");
+                        if (subgroupSize < 2) throw new Error("Xbar-S 图的子组大小 (n) 必须至少为 2。"); // S图严格来说n>=2，但通常n>=5更有意义
+                        if (parsedData.length < 2) throw new Error("Xbar-S 图至少需要 2 个子组。");
+                        data = parsedData;
+                        analysisType = 'xs';
+
+                    } else if (selectedChartType === 'auto') {
+                        // Automatic determination logic
+                        if (isMultiLineSingleValue) { // Clearly individuals presented row by row
+                            analysisType = 'imr';
+                            data = parsedData.map(arr => arr[0]);
+                            if (data.length < 2) throw new Error("I-MR 图至少需要2个数据点。");
+                        } else if (isSingleLineMultiValueIndividuals && subgroupSize >=2 && parsedData.length === 1 ) { // Single line, multiple values - assume individuals for IMR
+                            analysisType = 'imr';
+                            data = parsedData[0];
+                             if (data.length < 2) throw new Error("I-MR 图至少需要2个数据点。");
+                        } else if (parsedData.length >= 2 && subgroupSize >= 2 && isConsistentSize) { // Clearly subgroup data
+                            if (subgroupSize >= 10) { // General recommendation: S chart for n >= 5, or n >= 9 as previously used
+                                analysisType = 'xs';
+                            } else {
+                                analysisType = 'xr';
+                            }
+                            data = parsedData;
+                            if (data.length < 2) throw new Error("Xbar-R/X-S 图至少需要2个子组。");
+                        } else if (!isConsistentSize && parsedData.length > 1) {
+                             throw new Error("自动判断失败：检测到子组大小不一致。对于 X-R/X-S 图，所有子组大小必须相同。请检查数据或手动选择图表类型。");
+                        }
+                        else {
+                             // Fallback: if single line one value, or ambiguous format, treat as IMR if possible
+                             if (parsedData.flat().length >=2){
+                                analysisType = 'imr';
+                                data = parsedData.flat();
+                             } else {
+                                throw new Error("自动判断失败：无法根据数据格式确定图表类型。数据量过少或格式不明确。请检查数据或手动选择图表类型。");
+                             }
+                        }
+                    } else {
+                        throw new Error("未知的图表类型选择。");
+                    }
+                }
+
 
                  // Determine Target Script
                  switch (analysisType) {
                      case 'imr': targetScript = 'I-MR脚本.html'; break;
                      case 'xr': targetScript = 'X-R脚本.html'; break;
-                     case 'xs': targetScript = 'X-S脚本.html'; break;
-                     case 'p': targetScript = 'p-chart脚本.html'; break;
-                     case 'np': targetScript = 'np-chart脚本.html'; break;
-                     default: throw new Error("无法确定目标分析脚本。");
+                     case 'xs': targetScript = 'X-S脚本.html'; break; // Ensure you have this file
+                     case 'p': targetScript = 'p-chart脚本.html'; break; // Ensure you have this file
+                     case 'np': targetScript = 'np-chart脚本.html'; break; // Ensure you have this file
+                     default: throw new Error("无法确定目标分析脚本。分析类型: " + analysisType);
                  }
 
                  // Save data to localStorage and redirect
@@ -229,10 +287,14 @@
                       localStorage.removeItem('spcAdditionalData');
                  }
 
+                 console.log("Analysis Type:", analysisType);
+                 console.log("Data to save:", data);
+                 console.log("Target Script:", targetScript);
                  window.location.href = targetScript;
 
             } catch (e) {
                  errorMessageDiv.textContent = '错误: ' + e.message;
+                 console.error("Form submission error:", e);
                  return;
             }
         });
