@@ -54,6 +54,18 @@
         .conditional-inputs.visible { display: block; }
         .conditional-inputs label { font-weight: 500; font-size: 1rem; }
         .conditional-inputs textarea { min-height: 80px; }
+         /* Styles for dynamic messages */
+        .parsing-feedback {
+            font-size: 0.9em;
+            margin-top: -15px; /* Adjust to sit nicely below textarea */
+            margin-bottom: 15px;
+            padding: 8px;
+            border-radius: 4px;
+            display: block; /* Ensure it takes full width */
+        }
+        .parsing-feedback.info { color: #2c5282; background-color: #ebf8ff; border: 1px solid #bee3f8;}
+        .parsing-feedback.warning { color: #975a16; background-color: #fffaf0; border: 1px solid #fbd38d;}
+        .parsing-feedback.error { color: #9b2c2c; background-color: #fff5f5; border: 1px solid #fecaca;}
     </style>
 </head>
 <body>
@@ -68,13 +80,18 @@
             <div class="form-section">
                  <label for="spc-data">1. 输入测量数据:</label>
                  <textarea id="spc-data" name="spc-data" rows="8" required placeholder="请根据下方【数据格式要求】输入..."></textarea>
-                  <div class="instructions">
+                 <div id="parsing-feedback-container"></div> <div class="instructions">
                       <h4>数据格式要求</h4>
                       <ul>
-                          <li><strong>个体值 (自动选择 I-MR):</strong><ul><li>每行一个数据点，或所有数据点在同一行内用英文逗号 (,) 分隔。</li><li>示例: <code>1.143, 1.138, 1.148</code> 或: <pre>1.143&#10;1.138&#10;1.148</pre></li></ul></li>
-                          <li><strong>子组 (Xbar-R / Xbar-S):</strong><ul><li>每行代表一个子组。子组内数据点用英文逗号 (,) 分隔。</li><li><strong>重要:</strong> 所有子组大小 (每行点数) 必须相同。</li><li>您可以手动选择生成 Xbar-R 图或 Xbar-S 图。若选择“自动判断”，工具将根据子组大小推荐 (通常 n<9 用 Xbar-R, n≥9 用 Xbar-S)。</li><li>示例 (n=3): <pre>2.1, 2.2, 2.3&#10;2.0, 2.1, 2.2&#10;1.9, 2.0, 2.1</pre></li></ul></li>
-                          <li><strong>p/np 图数据:</strong><ul><li>请在下方手动选择图表类型。</li><li>此输入框内应输入每组的 **不合格品数/缺陷数** (每行一组，或单行逗号分隔)。</li><li>示例: <code>3, 2, 5, 1, 4</code> 或: <pre>3&#10;2&#10;5&#10;1&#10;4</pre></li></ul></li>
-                          <li>确保输入为数值，勿含单位或文本。</li>
+                          <li><strong>通用:</strong>
+                              <ul>
+                                  <li>数据点之间可以使用英文逗号 (<code>,</code>), 空格 ( ), 分号 (<code>;</code>) 或制表符 (Tab) 分隔。</li>
+                                  <li>请确保输入为数值，勿含单位或文本。</li>
+                              </ul>
+                          </li>
+                          <li><strong>个体值 (I-MR):</strong><ul><li>每行一个数据点，或所有数据点在同一行内用上述任一分隔符分隔。</li><li>示例: <code>1.143, 1.138, 1.148</code> 或 <code>1.143 1.138 1.148</code> 或: <pre>1.143&#10;1.138&#10;1.148</pre></li></ul></li>
+                          <li><strong>子组 (Xbar-R / Xbar-S):</strong><ul><li>每行代表一个子组。子组内数据点用上述任一分隔符分隔。</li><li><strong>重要:</strong> 所有子组大小 (每行点数) 必须相同。</li><li>您可以手动选择生成 Xbar-R 图或 Xbar-S 图。若选择“自动判断”，工具将根据子组大小推荐。</li><li>工具会尝试检测数据结构 (行数 x 列数)。如果检测结果与您的预期不符（例如行列反了），请检查您的输入或手动调整数据。</li><li>示例 (n=3): <pre>2.1, 2.2, 2.3&#10;2.0 2.1 2.2&#10;1.9;2.0;2.1</pre></li></ul></li>
+                          <li><strong>p/np 图数据:</strong><ul><li>请在下方手动选择图表类型。</li><li>此输入框内应输入每组的 **不合格品数/缺陷数** (每行一组，或单行用任一分隔符分隔)。</li><li>示例: <code>3, 2, 5, 1, 4</code> 或: <pre>3&#10;2&#10;5&#10;1&#10;4</pre></li></ul></li>
                       </ul>
                   </div>
              </div>
@@ -97,7 +114,7 @@
                  </select>
                  <span class="tooltip">默认根据数据格式自动选择。Xbar-R 通常用于子组大小 <9，Xbar-S 用于子组大小 ≥5 或需要更高精度。如需使用 p 图或 np 图等，请在此手动选择。</span>
              </div>
-             <div id="conditional-inputs-p" class="conditional-inputs"><label for="p-sample-sizes">为 p 图输入每组对应的样本量:</label><textarea id="p-sample-sizes" name="p-sample-sizes" rows="3" placeholder="每行一个样本量，或单行逗号分隔，需与上方数据行/个数一一对应。&#10;示例: 100, 105, 98, 100, 102"></textarea><span class="tooltip">p 图要求输入每组检查的总数（样本大小），顺序和数量必须与数据输入一致。</span></div>
+             <div id="conditional-inputs-p" class="conditional-inputs"><label for="p-sample-sizes">为 p 图输入每组对应的样本量:</label><textarea id="p-sample-sizes" name="p-sample-sizes" rows="3" placeholder="每行一个样本量，或单行逗号/空格等分隔，需与上方数据行/个数一一对应。&#10;示例: 100, 105, 98, 100, 102"></textarea><span class="tooltip">p 图要求输入每组检查的总数（样本大小），顺序和数量必须与数据输入一致。</span></div>
              <div id="conditional-inputs-np" class="conditional-inputs"><label for="np-sample-size">为 np 图输入固定的子组样本量:</label><input type="number" id="np-sample-size" name="np-sample-size" min="1" step="1" placeholder="输入一个正整数"><span class="tooltip">np 图要求所有子组的样本大小都相同。</span></div>
 
             <button type="submit">开始分析</button>
@@ -109,6 +126,7 @@
         const chartTypeSelect = document.getElementById('chart-type');
         const conditionalP = document.getElementById('conditional-inputs-p');
         const conditionalNp = document.getElementById('conditional-inputs-np');
+        const parsingFeedbackContainer = document.getElementById('parsing-feedback-container');
 
         chartTypeSelect.addEventListener('change', function() {
             conditionalP.classList.remove('visible');
@@ -123,178 +141,190 @@
         document.getElementById('spc-form').addEventListener('submit', function(event) {
             event.preventDefault();
             const errorMessageDiv = document.getElementById('error-message');
-            errorMessageDiv.textContent = '';
+            errorMessageDiv.textContent = ''; // Clear previous main error
+            parsingFeedbackContainer.innerHTML = ''; // Clear previous parsing feedback
 
             const dataInput = document.getElementById('spc-data').value.trim();
             const uslInput = document.getElementById('usl').value;
             const lslInput = document.getElementById('lsl').value;
             const selectedChartType = chartTypeSelect.value;
 
-            const usl = uslInput === '' ? null : parseFloat(uslInput);
+            const usl = uslInput === '' ? null : parseFloat(uslInput); // Keep parsing here for immediate use if needed
             const lsl = lslInput === '' ? null : parseFloat(lslInput);
 
             if (dataInput === '') { errorMessageDiv.textContent = '错误: 请输入测量数据。'; return; }
 
-            let data;
-            let analysisType; // This will store the final determined chart type (imr, xr, xs, p, np)
-            let targetScript;
-            let additionalData = {};
+            let rawDataArrays = [];
+            let parsingSuccess = true;
+            let parsingErrorMessage = "";
 
             try {
-                 const lines = dataInput.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-                 if (lines.length === 0) { throw new Error("输入的数据为空或无效。"); }
+                const lines = dataInput.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                if (lines.length === 0) {
+                    throw new Error("输入的数据为空或无效 (没有有效行)。");
+                }
 
-                 let subgroupSize = -1;
-                 let isConsistentSize = true;
-                 const parsedData = lines.map((line, index) => {
-                     const values = line.split(',')
-                                      .map(val => val.trim())
-                                      .filter(val => val !== '')
-                                      .map(val => {
-                                          const num = parseFloat(val);
-                                          if (isNaN(num)) throw new Error(`数据输入错误：第 ${index + 1} 行的 "${val}" 不是一个有效数值。`);
-                                          return num;
-                                      });
-                     if (values.length === 0 && lines.length === 1 && dataInput.includes(',')) { // Special case for single line comma separated with potential empty last element if trailing comma
-                         // This was already handled by filter(val => val !== '') effectively.
-                         // If after filtering, values.length is still 0, it's an error.
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const valuesString = line.split(/\s*[,;\s]\s*/).map(val => val.trim()).filter(val => val !== '');
+
+                    if (valuesString.length === 0 && line.length > 0) { // Line was not empty but parsing yielded nothing (e.g. only delimiters)
+                        // Potentially an issue, but let's collect all lines first.
+                        // We will filter out completely empty/NaN rows later.
+                        rawDataArrays.push([]);
+                        continue;
+                    }
+                     if (valuesString.length === 0 && line.length === 0) { // Truly empty line after split and trim, skip.
+                         continue;
                      }
-                     if (values.length === 0) throw new Error(`数据输入错误：第 ${index + 1} 行解析后没有有效的数值数据。`);
 
 
-                     if (index === 0) {
-                         subgroupSize = values.length;
-                     } else if (values.length !== subgroupSize) {
-                         isConsistentSize = false;
-                     }
-                     return values;
-                 });
+                    const numericValues = valuesString.map(valStr => {
+                        const num = parseFloat(valStr);
+                        if (isNaN(num)) {
+                            parsingSuccess = false; // Mark as unsuccessful but continue parsing other values/lines
+                            if (!parsingErrorMessage) { // Store only the first error message for this stage
+                                parsingErrorMessage = `数据输入错误：第 ${i + 1} 行的 "${valStr}" 不是一个有效数值。请确保所有数据均为数字，并使用逗号、空格、分号或制表符分隔。`;
+                            }
+                        }
+                        return num; // Keep NaN for now, will filter later or use for detailed error
+                    });
+                    rawDataArrays.push(numericValues);
+                }
 
-                 // --- Chart Type Determination Logic ---
-                if (selectedChartType === 'p') {
-                    analysisType = 'p';
-                    if (parsedData.some(arr => arr.length > 1)) throw new Error("p 图数据格式错误：主数据框每行应只包含一个不合格品计数值。");
-                    data = parsedData.map(arr => arr[0]);
-                    if (data.length < 1) throw new Error("p 图至少需要1个数据点。");
+                if (!parsingSuccess) { // If any NaN was encountered
+                    throw new Error(parsingErrorMessage); // Throw the first encountered parsing error
+                }
 
-                    const sampleSizesInput = document.getElementById('p-sample-sizes').value.trim();
-                    if (!sampleSizesInput) throw new Error("p 图需要输入对应的样本量。");
-                    const sampleSizes = sampleSizesInput.split(/[\n,]+/).map(s => s.trim()).filter(s => s !== '').map(s => parseInt(s));
-                    if (sampleSizes.some(isNaN) || sampleSizes.some(n => n <= 0)) throw new Error("p 图样本量必须是正整数。");
-                    if (sampleSizes.length !== data.length) throw new Error("p 图样本量个数 (" + sampleSizes.length + ") 必须与数据点/组数 (" + data.length + ") 相同。");
-                    additionalData.sampleSizes = sampleSizes;
+                // Filter out rows that are entirely NaN or empty after parsing attempt
+                rawDataArrays = rawDataArrays.filter(arr => arr.length > 0 && arr.some(val => !isNaN(val)));
 
-                } else if (selectedChartType === 'np') {
-                    analysisType = 'np';
-                    if (parsedData.some(arr => arr.length > 1)) throw new Error("np 图数据格式错误：主数据框每行应只包含一个不合格品计数值。");
-                    data = parsedData.map(arr => arr[0]);
-                    if (data.length < 1) throw new Error("np 图至少需要1个数据点。");
+                if (rawDataArrays.length === 0) {
+                    throw new Error("解析后未找到任何有效的数值数据。请检查您的数据格式和分隔符。");
+                }
 
-                    const sampleSizeInput = document.getElementById('np-sample-size').value;
-                    if (!sampleSizeInput) throw new Error("np 图需要输入固定的子组样本量。");
-                    const fixedSampleSize = parseInt(sampleSizeInput); // Renamed to avoid conflict
-                    if (isNaN(fixedSampleSize) || fixedSampleSize <= 0) throw new Error("np 图样本量必须是正整数。");
-                    additionalData.sampleSize = fixedSampleSize;
+                let k_parsed = rawDataArrays.length;
+                let n_parsed_array = rawDataArrays.map(arr => arr.length);
+                let isConsistentSize = n_parsed_array.every(len => len === n_parsed_array[0]);
+                let n_parsed = isConsistentSize ? (n_parsed_array[0] || 0) : -1;
 
-                } else { // Handles 'auto', 'imr', 'xr', 'xs'
-                    const isMultiLineSingleValue = parsedData.length > 1 && subgroupSize === 1 && isConsistentSize;
-                    const isSingleLineMultiValueIndividuals = parsedData.length === 1 && subgroupSize > 1; // Potentially individuals if selectedChartType is 'imr' or 'auto' defaults to it.
+                // Display parsing feedback
+                let feedbackHTML = '';
+                if (isConsistentSize && k_parsed > 0 && n_parsed > 0) {
+                    feedbackHTML = `<p class="parsing-feedback info">检测到数据结构：${k_parsed} 个子组 (行)，每个子组 ${n_parsed} 个观测值 (列)。</p>`;
+                    const TYPICAL_MAX_SUBGROUP_SIZE = 15;
+                    const TYPICAL_MIN_SUBGROUPS_FOR_TRANSPOSE_CONSIDERATION = Math.min(k_parsed, 10); // Be more conservative
 
+                    if (n_parsed > k_parsed && n_parsed > TYPICAL_MAX_SUBGROUP_SIZE && k_parsed < TYPICAL_MAX_SUBGROUP_SIZE && n_parsed >= TYPICAL_MIN_SUBGROUPS_FOR_TRANSPOSE_CONSIDERATION) {
+                        feedbackHTML += `<p class="parsing-feedback warning"><strong>提示：</strong>检测到的列数 (${n_parsed}) 远大于行数 (${k_parsed})，且行数 (${k_parsed}) 较小。这可能表示数据行列录入反了 (例如，您期望的是 ${n_parsed} 行, ${k_parsed} 列吗?)。如果工具分析结果与预期不符，请检查您的数据输入格式或尝试调整数据。未来版本可能提供数据转置功能。</p>`;
+                    }
+                } else if (!isConsistentSize && k_parsed > 1) {
+                     feedbackHTML = `<p class="parsing-feedback warning"><strong>警告：检测到数据每行的观测值数量不一致。</strong> 如果您打算进行 Xbar-R 或 Xbar-S 分析，所有子组的大小必须相同。若是 I-MR 数据，请确保每行一个值，或所有值在单行内分隔。</p>`;
+                }
+                parsingFeedbackContainer.innerHTML = feedbackHTML;
+
+
+                // Chart Type Determination (using k_parsed, n_parsed, isConsistentSize)
+                let data;
+                let analysisType;
+                let additionalData = {}; // Initialize here
+
+                if (selectedChartType === 'p' || selectedChartType === 'np') {
+                    // For p/np, we expect either multiple single-value rows, or one multi-value row.
+                    // If multiple rows, all must be single value.
+                    const isMultiRowSingleValue = k_parsed > 1 && n_parsed_array.every(len => len === 1);
+                    const isSingleRowMultiValue = k_parsed === 1 && n_parsed > 0;
+
+                    if (!(isMultiRowSingleValue || isSingleRowMultiValue)) {
+                         throw new Error(`${selectedChartType.toUpperCase()} 图的数据格式错误：应为每行一个计数值，或所有计数值在单行内分隔。检测到 ${k_parsed} 行, 每行值数: ${n_parsed_array.join(', ')}`);
+                    }
+                    data = rawDataArrays.flat().filter(val => !isNaN(val));
+
+                    if (data.length < 1) throw new Error(`${selectedChartType.toUpperCase()} 图至少需要1个数据点。`);
+                    analysisType = selectedChartType;
+
+                    if (selectedChartType === 'p') {
+                        const sampleSizesInput = document.getElementById('p-sample-sizes').value.trim();
+                        if (!sampleSizesInput) throw new Error("p 图需要输入对应的样本量。");
+                        const sampleSizes = sampleSizesInput.split(/[\n\s*[,;\s]\s*]+/).map(s => s.trim()).filter(s => s !== '').map(s => parseInt(s)); // Use flexible delimiter for sample sizes too
+                        if (sampleSizes.some(isNaN) || sampleSizes.some(num => num <= 0)) throw new Error("p 图样本量必须是正整数。");
+                        if (sampleSizes.length !== data.length) throw new Error(`p 图样本量个数 (${sampleSizes.length}) 必须与缺陷/不合格品数 (${data.length}) 相同。`);
+                        additionalData.sampleSizes = sampleSizes;
+                    } else { // np
+                        const sampleSizeInput = document.getElementById('np-sample-size').value;
+                        if (!sampleSizeInput) throw new Error("np 图需要输入固定的子组样本量。");
+                        const fixedSampleSize = parseInt(sampleSizeInput);
+                        if (isNaN(fixedSampleSize) || fixedSampleSize <= 0) throw new Error("np 图样本量必须是正整数。");
+                        additionalData.sampleSize = fixedSampleSize;
+                    }
+                } else { // IMR, XR, XS or AUTO
                     if (selectedChartType === 'imr') {
-                        if (isMultiLineSingleValue) { // Multiple lines, each is an individual
-                             data = parsedData.map(arr => arr[0]);
-                        } else if (isSingleLineMultiValueIndividuals) { // Single line, all are individuals
-                             data = parsedData[0];
-                        } else if (parsedData.length > 1 && subgroupSize > 1 && isConsistentSize) { // User selected IMR but provided subgroup data
-                            throw new Error("选择了 I-MR 图，但输入的数据看起来是子组数据 (每行多个值)。I-MR 图需要每行单个值或单行逗号分隔的多个值。");
-                        } else if (!isConsistentSize) {
-                            throw new Error("选择了 I-MR 图，但输入的数据行包含不同数量的值。请检查数据格式。");
-                        }
-                        else { // Fallback for other single line cases not fitting perfectly
-                             data = parsedData.flat(); // Flatten in case of any ambiguity, treat as individuals
-                        }
+                        data = rawDataArrays.flat().filter(val => !isNaN(val));
                         if (data.length < 2) throw new Error("I-MR 图至少需要2个数据点。");
                         analysisType = 'imr';
-
-                    } else if (selectedChartType === 'xr') {
-                        if (!isConsistentSize) throw new Error("选择了 Xbar-R 图，但子组大小不一致。Xbar-R 图要求所有子组大小相同。");
-                        if (subgroupSize < 2) throw new Error("Xbar-R 图的子组大小 (n) 必须至少为 2。");
-                        if (parsedData.length < 2) throw new Error("Xbar-R 图至少需要 2 个子组。");
-                        data = parsedData;
-                        analysisType = 'xr';
-
-                    } else if (selectedChartType === 'xs') {
-                        if (!isConsistentSize) throw new Error("选择了 Xbar-S 图，但子组大小不一致。Xbar-S 图要求所有子组大小相同。");
-                        if (subgroupSize < 2) throw new Error("Xbar-S 图的子组大小 (n) 必须至少为 2。"); // S图严格来说n>=2，但通常n>=5更有意义
-                        if (parsedData.length < 2) throw new Error("Xbar-S 图至少需要 2 个子组。");
-                        data = parsedData;
-                        analysisType = 'xs';
-
+                    } else if (selectedChartType === 'xr' || selectedChartType === 'xs') {
+                        if (!isConsistentSize) throw new Error(`选择了 ${selectedChartType.toUpperCase()} 图，但子组大小不一致。此图表要求所有子组大小相同。`);
+                        if (n_parsed < 2) throw new Error(`${selectedChartType.toUpperCase()} 图的子组大小 (n) 必须至少为 2。当前检测到大小为: ${n_parsed}`);
+                        if (k_parsed < 2) throw new Error(`${selectedChartType.toUpperCase()} 图至少需要 2 个子组。当前检测到子组数为: ${k_parsed}`);
+                        data = rawDataArrays.map(row => row.filter(val => !isNaN(val))); // Ensure only numbers in final data
+                        analysisType = selectedChartType;
                     } else if (selectedChartType === 'auto') {
-                        // Automatic determination logic
-                        if (isMultiLineSingleValue) { // Clearly individuals presented row by row
+                        if (k_parsed === 1 && n_parsed > 1) { // Single row, multiple values -> IMR
+                            data = rawDataArrays[0].filter(val => !isNaN(val));
+                            if (data.length < 2) throw new Error("I-MR 图（自动判断，单行数据）至少需要2个数据点。");
                             analysisType = 'imr';
-                            data = parsedData.map(arr => arr[0]);
-                            if (data.length < 2) throw new Error("I-MR 图至少需要2个数据点。");
-                        } else if (isSingleLineMultiValueIndividuals && subgroupSize >=2 && parsedData.length === 1 ) { // Single line, multiple values - assume individuals for IMR
+                        } else if (n_parsed === 1 && k_parsed > 1) { // Multiple rows, single value per row -> IMR
+                            data = rawDataArrays.map(arr => arr[0]).filter(val => !isNaN(val));
+                            if (data.length < 2) throw new Error("I-MR 图（自动判断，多行单值数据）至少需要2个数据点。");
                             analysisType = 'imr';
-                            data = parsedData[0];
-                             if (data.length < 2) throw new Error("I-MR 图至少需要2个数据点。");
-                        } else if (parsedData.length >= 2 && subgroupSize >= 2 && isConsistentSize) { // Clearly subgroup data
-                            if (subgroupSize >= 10) { // General recommendation: S chart for n >= 5, or n >= 9 as previously used
-                                analysisType = 'xs';
+                        } else if (isConsistentSize && n_parsed >= 2 && k_parsed >= 2) { // Clear subgroup structure
+                            data = rawDataArrays.map(row => row.filter(val => !isNaN(val)));
+                            analysisType = (n_parsed >= 5) ? 'xs' : 'xr'; // Default: n >= 5 use X-S
+                        } else if (!isConsistentSize && k_parsed > 1) {
+                             throw new Error("自动判断失败：检测到数据每行的观测值数量不一致。对于 X-R/X-S 图，所有子组大小必须相同。请手动选择图表类型或修正数据。");
+                        } else {
+                            data = rawDataArrays.flat().filter(val => !isNaN(val));
+                            if (data.length >= 2) {
+                                analysisType = 'imr'; // Fallback to IMR if some data exists
                             } else {
-                                analysisType = 'xr';
-                            }
-                            data = parsedData;
-                            if (data.length < 2) throw new Error("Xbar-R/X-S 图至少需要2个子组。");
-                        } else if (!isConsistentSize && parsedData.length > 1) {
-                             throw new Error("自动判断失败：检测到子组大小不一致。对于 X-R/X-S 图，所有子组大小必须相同。请检查数据或手动选择图表类型。");
-                        }
-                        else {
-                             // Fallback: if single line one value, or ambiguous format, treat as IMR if possible
-                             if (parsedData.flat().length >=2){
-                                analysisType = 'imr';
-                                data = parsedData.flat();
-                             } else {
                                 throw new Error("自动判断失败：无法根据数据格式确定图表类型。数据量过少或格式不明确。请检查数据或手动选择图表类型。");
-                             }
+                            }
                         }
                     } else {
-                        throw new Error("未知的图表类型选择。");
+                         throw new Error("未知的图表类型选择或无法处理的数据结构。");
                     }
                 }
 
+                let targetScript;
+                switch (analysisType) {
+                    case 'imr': targetScript = 'I-MR脚本.html'; break;
+                    case 'xr': targetScript = 'X-R脚本.html'; break;
+                    case 'xs': targetScript = 'X-S脚本.html'; break;
+                    case 'p': targetScript = 'p-chart脚本.html'; break;
+                    case 'np': targetScript = 'np-chart脚本.html'; break;
+                    default: throw new Error(`无法确定目标分析脚本。分析类型: ${analysisType} 未定义。`);
+                }
 
-                 // Determine Target Script
-                 switch (analysisType) {
-                     case 'imr': targetScript = 'I-MR脚本.html'; break;
-                     case 'xr': targetScript = 'X-R脚本.html'; break;
-                     case 'xs': targetScript = 'X-S脚本.html'; break; // Ensure you have this file
-                     case 'p': targetScript = 'p-chart脚本.html'; break; // Ensure you have this file
-                     case 'np': targetScript = 'np-chart脚本.html'; break; // Ensure you have this file
-                     default: throw new Error("无法确定目标分析脚本。分析类型: " + analysisType);
-                 }
+                localStorage.setItem('spcAnalysisType', analysisType);
+                localStorage.setItem('spcData', JSON.stringify(data));
+                localStorage.setItem('spcUSL', JSON.stringify(uslInput === '' ? null : parseFloat(uslInput)));
+                localStorage.setItem('spcLSL', JSON.stringify(lslInput === '' ? null : parseFloat(lslInput)));
 
-                 // Save data to localStorage and redirect
-                 localStorage.setItem('spcAnalysisType', analysisType);
-                 localStorage.setItem('spcData', JSON.stringify(data));
-                 localStorage.setItem('spcUSL', JSON.stringify(usl));
-                 localStorage.setItem('spcLSL', JSON.stringify(lsl));
-                 if (Object.keys(additionalData).length > 0) {
-                     localStorage.setItem('spcAdditionalData', JSON.stringify(additionalData));
-                 } else {
-                      localStorage.removeItem('spcAdditionalData');
-                 }
+                if (Object.keys(additionalData).length > 0) {
+                    localStorage.setItem('spcAdditionalData', JSON.stringify(additionalData));
+                } else {
+                     localStorage.removeItem('spcAdditionalData');
+                }
 
-                 console.log("Analysis Type:", analysisType);
-                 console.log("Data to save:", data);
-                 console.log("Target Script:", targetScript);
-                 window.location.href = targetScript;
+                console.log("Final Analysis Type:", analysisType);
+                console.log("Final Data to save:", data);
+                console.log("Target Script:", targetScript);
+                window.location.href = targetScript;
 
             } catch (e) {
                  errorMessageDiv.textContent = '错误: ' + e.message;
-                 console.error("Form submission error:", e);
+                 console.error("Form submission error details:", e);
+                 // No need to clear parsing feedback here, it's part of the try or handled by next submit
                  return;
             }
         });
