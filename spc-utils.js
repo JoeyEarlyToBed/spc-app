@@ -378,6 +378,22 @@ function displayError(message, containerId = 'error-container') {
        alert("发生错误: " + message); // Fallback
    }
 }
+// spc-utils.js
+// ... (已有代码) ...
+
+// --- 日期时间格式化 ---
+const getCurrentTimestamp = () => {
+    const now = new Date();
+    const YYYY = now.getFullYear();
+    const MM = String(now.getMonth() + 1).padStart(2, '0');
+    const DD = String(now.getDate()).padStart(2, '0');
+    const HH = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    return `${YYYY}-${MM}-${DD} ${HH}:${mm}:${ss}`;
+};
+
+// ... (其余 spc-utils.js 内容) ...
 
 // 如果使用模块化系统，可以在这里导出:
 // export { CONTROL_CHART_CONSTANTS, IMR_CONSTANTS, mean, stdDev, ... };

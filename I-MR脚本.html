@@ -108,6 +108,19 @@
           <div id="stability-summary" class="stability-summary">
               <p><strong>过程稳定性分析:</strong> <span id="stability-analysis"></span></p><div id="violations-list"></div><p style="margin-top: 1rem;"><strong>过程能力分析 (基于 MR̄/d₂):</strong> <span id="capability-analysis-mrbar"></span></p><p><strong>过程性能分析 (基于 s):</strong> <span id="performance-analysis"></span></p><p style="margin-top: 1rem;"><strong>控制图解释:</strong> <span id="interpretation"></span></p>
           </div>
+          <div id="ai-assist-section" style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee;">
+            <h3>AI 辅助分析与建议</h3>
+            <div>
+                <label for="user-context-imr"><strong>补充应用场景或具体问题 (可选):</strong></label>
+                <textarea id="user-context-imr" rows="3" placeholder="例如：这些数据来自XX产线的活塞环外径测量，我想知道过程是否稳定以及能力是否达标，并寻求改进建议。" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;"></textarea>
+            </div>
+            <button id="generate-report-imr" style="margin-top: 10px; padding: 8px 15px; background-color: #e67e22; color: white; border: none; border-radius: 4px; cursor: pointer;">生成 AI 提示词报告</button>
+            <div id="report-output-imr-container" style="margin-top: 15px; display: none;">
+                <label for="report-output-imr"><strong>AI 提示词报告 (请复制以下内容到 AI 对话框):</strong></label>
+                <textarea id="report-output-imr" rows="15" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background-color: #f9f9f9; white-space: pre-wrap;"></textarea>
+                <button id="copy-report-imr" style="margin-top: 5px; padding: 6px 12px;">复制报告</button>
+            </div>
+        </div>
           <details class="rules-card">
             <summary>查看控制图判异规则 (8项)</summary>
             <ul>
@@ -510,6 +523,91 @@
             window.currentCharts = window.currentCharts || {};
             window.currentCharts.normality = normalityChart;
         }
+        // --- AI 报告生成相关 ---
+        function generateIMRReportText(results, userContext) {
+            const na = '未设置';
+            let report = `# SPC 分析报告 (I-MR 图)\n\n`;
+            report += `## 报告生成时间\n${getCurrentTimestamp()}\n\n`; // 使用 utils 中的函数
+
+            report += `## 1. 基本统计信息\n`;
+            report += `- 数据点数量 (k): ${results.k || na}\n`;
+            report += `- 个体值均值 (Ī): ${formatNum(results.iBar)}\n`;
+            report += `- 移动极差均值 (MR̄): ${formatNum(results.mrBar)}\n`;
+            report += `- 过程标准差估计 (σ̂ = MR̄/d₂): ${formatNum(results.sigmaMRbar)}\n`;
+            report += `- 整体样本标准差 (s): ${formatNum(results.overallStdDevS)}\n\n`;
+
+            report += `## 2. 规格限 (用户输入)\n`;
+            report += `- 规格上限 (USL): ${results.USL === null ? na : formatNum(results.USL)}\n`;
+            report += `- 规格下限 (LSL): ${results.LSL === null ? na : formatNum(results.LSL)}\n\n`;
+
+            report += `## 3. 控制限\n`;
+            report += `### 3.1. 个体值 (I) 图\n`;
+            report += `- 上控制限 (UCL): ${formatNum(results.iUCL)}\n`;
+            report += `- 中心线 (CL): ${formatNum(results.iCL)}\n`;
+            report += `- 下控制限 (LCL): ${formatNum(results.iLCL)}\n`;
+            report += `- +2σ 区间: [${formatNum(results.iLCL2Sigma)}, ${formatNum(results.iUCL2Sigma)}]\n`;
+            report += `- +1σ 区间: [${formatNum(results.iLCL1Sigma)}, ${formatNum(results.iUCL1Sigma)}]\n`;
+            report += `### 3.2. 移动极差 (MR) 图\n`;
+            report += `- 上控制限 (UCL): ${formatNum(results.mrUCL)}\n`;
+            report += `- 中心线 (CL): ${formatNum(results.mrCL)}\n`;
+            report += `- 下控制限 (LCL): ${formatNum(results.mrLCL)}\n\n`;
+
+            report += `## 4. 正态性检验 (基于个体值)\n`;
+            report += `- 偏度 (Skewness): ${formatIndex(results.skewness, 3)}\n`;
+            report += `- 峰度 (Kurtosis): ${formatIndex(results.kurtosis, 3)}\n`;
+            report += `- 结论: ${results.normalityConclusionText.replace(/<span style='color:\w+'>|<\/span>/g, '')}\n\n`; // 移除HTML标签
+
+            report += `## 5. 过程稳定性分析 (基于I-MR图和8项判异规则)\n`;
+            report += `- 整体结论: ${results.stabilityMessage.replace(/<span style='color:\w+'>|<\/span>/g, '')}\n`;
+
+            report += `### 5.1. I 图西格玛规则违规详情:\n`;
+            if (Object.keys(results.violations).length > 0) {
+                const violatedRuleNumbers = Object.keys(results.violations).map(Number).sort((a, b) => a - b);
+                violatedRuleNumbers.forEach(ruleNum => {
+                    const indices = results.violations[ruleNum];
+                    const displayIndices = indices.map(i => i + 1).join(', ');
+                    const valuesForRule = indices.map(i => formatNum(results.iValues[i], 4)).join(', '); // 获取对应值
+                    report += `  - 规则 ${ruleNum} (${results.ruleDescriptions[ruleNum]}): 点 ${displayIndices} (对应数值 ${valuesForRule})\n`;
+                });
+            } else {
+                report += `  无违规点。\n`;
+            }
+
+            report += `### 5.2. MR 图超出控制限点 (通常仅检查UCL):\n`;
+            if (results.mrPointsOutOfControlIndices && results.mrPointsOutOfControlIndices.length > 0) {
+                const mrDisplayIndices = results.mrPointsOutOfControlIndices.map(i => i + 1).join(', '); // 0-based to 1-based
+                // mrValues 在 calculateAndDisplay 中是有效MR值数组，其索引与 mrPointsOutOfControlIndices 中的索引对应
+                const mrViolatingValues = results.mrPointsOutOfControlIndices.map(i => formatNum(results.mrValues[i], 4)).join(', ');
+                report += `  - 点 ${mrDisplayIndices} (对应MR值 ${mrViolatingValues})\n`;
+            } else {
+                report += `  无违规点。\n`;
+            }
+            report += `\n`;
+
+            report += `## 6. 过程能力/性能分析\n`;
+            if (results.USL === null || results.LSL === null) {
+                report += `未提供规格上限(USL)和规格下限(LSL)，无法计算过程能力及性能指数。\n`;
+            } else {
+                report += `### 6.1. 过程能力 (基于组内变异 σ̂ = MR̄/d₂)\n`;
+                report += `  - Cp: ${formatIndex(results.Cp_MRbar)}\n`;
+                report += `  - Cpk: ${formatIndex(results.Cpk_MRbar)} (评价: ${getEvaluation(results.Cpk_MRbar)})\n`;
+                report += `  - Cpu: ${formatIndex(results.CpU_MRbar)}\n`;
+                report += `  - Cpl: ${formatIndex(results.CpL_MRbar)}\n`;
+                report += `### 6.2. 过程性能 (基于整体变异 s)\n`;
+                report += `  - Pp: ${formatIndex(results.Pp)}\n`;
+                report += `  - Ppk: ${formatIndex(results.Ppk)} (评价: ${getEvaluation(results.Ppk)})\n`;
+                report += `  - Ppu: ${formatIndex(results.PpU_s)}\n`;
+                report += `  - Ppl: ${formatIndex(results.PpL_s)}\n`;
+                report += `### 6.3. 能力/性能解读:\n${results.interpretationTextShort || "请结合具体指标判断。"}\n`;
+            }
+            report += `\n`;
+
+            report += `## 7. 用户补充信息\n`;
+            report += `${userContext || '用户未提供额外上下文信息。'}\n`;
+
+            return report;
+        }
+
 
         // --- Initialization and Event Listeners (不变) ---
         document.addEventListener('DOMContentLoaded', (event) => {
@@ -524,6 +622,86 @@
                 if (isNaN(USL)) USL = null;
                 if (isNaN(LSL)) LSL = null;
                 calculateAndDisplay();
+                const generateReportBtnIMR = document.getElementById('generate-report-imr');
+                const reportOutputContainerIMR = document.getElementById('report-output-imr-container');
+                const reportOutputTextareaIMR = document.getElementById('report-output-imr');
+                const userContextTextareaIMR = document.getElementById('user-context-imr');
+                const copyReportBtnIMR = document.getElementById('copy-report-imr');
+
+                if (generateReportBtnIMR) {
+                    generateReportBtnIMR.addEventListener('click', function() {
+                        // 确保所有计算已完成并且全局变量已填充
+                        if (typeof iBar === 'undefined') { // 检查一个关键变量是否已计算
+                        alert("请先等待分析结果加载完成。");
+                        return;
+                    }
+
+                    const userContext = userContextTextareaIMR.value.trim();
+                    const results = {
+                        k: iValues.length, // 使用过滤后的 iValues 长度
+                        iBar: iBar,
+                        mrBar: mrBar,
+                        sigmaMRbar: sigmaMRbar,
+                        overallStdDevS: stdDev(iValues, true), // 确保使用最新的 s
+                        USL: USL,
+                        LSL: LSL,
+                        iUCL: iUCL, iCL: iCL, iLCL: iLCL,
+                        iUCL2Sigma: iBar + 2 * sigmaMRbar, iLCL2Sigma: iBar - 2 * sigmaMRbar,
+                        iUCL1Sigma: iBar + 1 * sigmaMRbar, iLCL1Sigma: iBar - 1 * sigmaMRbar,
+                        mrUCL: mrUCL, mrCL: mrCL, mrLCL: mrLCL,
+                        skewness: skewness(iValues), // 假设 iValues 是全局的
+                        kurtosis: kurtosis(iValues),
+                        normalityConclusionText: document.getElementById('normality-conclusion') ? document.getElementById('normality-conclusion').innerHTML : "N/A",
+                        stabilityMessage: document.getElementById('stability-analysis') ? document.getElementById('stability-analysis').innerHTML : "N/A",
+                        violations: window.currentViolations || {}, // 假设 violations 存在全局或能访问
+                        ruleDescriptions: window.currentRuleDescriptions || {}, // 假设 ruleDescriptions 存在全局
+                        iValues: iValues, // 用于提取违规点数值
+                        mrPointsOutOfControlIndices: window.currentMrViolationsIndices || [], // 假设 MR 违规点索引列表存在全局
+                        mrValues: mrValues, // 使用全局的有效 mrValues
+                        Cp_MRbar: (USL !== null && LSL !== null && isFinite(sigmaMRbar) && sigmaMRbar !== 0) ? (USL - LSL) / (6 * sigmaMRbar) : NaN,
+                        Cpk_MRbar: Math.min(
+                            (USL !== null && isFinite(sigmaMRbar) && sigmaMRbar !== 0) ? (USL - iBar) / (3 * sigmaMRbar) : NaN,
+                            (LSL !== null && isFinite(sigmaMRbar) && sigmaMRbar !== 0) ? (iBar - LSL) / (3 * sigmaMRbar) : NaN
+                        ),
+                        CpU_MRbar: (USL !== null && isFinite(sigmaMRbar) && sigmaMRbar !== 0) ? (USL - iBar) / (3 * sigmaMRbar) : NaN,
+                        CpL_MRbar: (LSL !== null && isFinite(sigmaMRbar) && sigmaMRbar !== 0) ? (iBar - LSL) / (3 * sigmaMRbar) : NaN,
+                        Pp: (USL !== null && LSL !== null && isFinite(stdDev(iValues, true)) && stdDev(iValues, true) !== 0) ? (USL - LSL) / (6 * stdDev(iValues, true)) : NaN,
+                        Ppk: Math.min(
+                             (USL !== null && isFinite(stdDev(iValues, true)) && stdDev(iValues, true) !== 0) ? (USL - iBar) / (3 * stdDev(iValues, true)) : NaN,
+                             (LSL !== null && isFinite(stdDev(iValues, true)) && stdDev(iValues, true) !== 0) ? (iBar - LSL) / (3 * stdDev(iValues, true)) : NaN
+                        ),
+                        PpU_s: (USL !== null && isFinite(stdDev(iValues, true)) && stdDev(iValues, true) !== 0) ? (USL - iBar) / (3 * stdDev(iValues, true)) : NaN,
+                        PpL_s: (LSL !== null && isFinite(stdDev(iValues, true)) && stdDev(iValues, true) !== 0) ? (iBar - LSL) / (3 * stdDev(iValues, true)) : NaN,
+                        interpretationTextShort: document.getElementById('interpretation') ? document.getElementById('interpretation').textContent.split('。')[0] + '。' : "N/A" // 简化解释
+                    };
+                    // 在 calculateAndDisplay 中将 violations 和 ruleDescriptions 赋值给全局变量或通过其他方式传递
+                    // 例如: window.currentViolations = ruleCheckResult.violations;
+                    //       window.currentRuleDescriptions = ruleCheckResult.descriptions;
+                    //       window.currentMrViolationsIndices = mrPointsOutOfControlIndices;
+
+                    const reportText = generateIMRReportText(results, userContext);
+                    reportOutputTextareaIMR.value = reportText;
+                    reportOutputContainerIMR.style.display = 'block';
+                });
+            }
+
+                if (copyReportBtnIMR) {
+                    copyReportBtnIMR.addEventListener('click', function() {
+                        reportOutputTextareaIMR.select();
+                        try {
+                            document.execCommand('copy'); // 旧 API，兼容性好
+                        alert('报告已复制到剪贴板！');
+                    } catch (err) {
+                        // 尝试新的 Clipboard API
+                        navigator.clipboard.writeText(reportOutputTextareaIMR.value).then(function() {
+                            alert('报告已复制到剪贴板！');
+                        }, function(clipboardErr) {
+                            alert('复制失败，请手动复制。');
+                            console.error('Clipboard API copy failed: ', clipboardErr);
+                        });
+                    }
+                });
+            }
              } catch (error) {
                  console.error("无法从 localStorage 加载或解析数据:", error);
                  displayError("错误: 无法加载或解析所需数据 - " + error.message + "。请确保从首页正确导航。");

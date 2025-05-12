@@ -207,6 +207,21 @@
             <p><strong>过程性能分析 (基于 s<sub>overall</sub>):</strong> <span id="performance-analysis">N/A</span></p>
             <p style="margin-top: 1rem;"><strong>控制图解释:</strong> <span id="interpretation">N/A</span></p>
         </div>
+
+        <div id="ai-assist-section-xs" style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee;">
+            <h3>AI 辅助分析与建议</h3>
+            <div>
+                <label for="user-context-xs"><strong>补充应用场景或具体问题 (可选):</strong></label>
+                <textarea id="user-context-xs" rows="3" placeholder="例如：这些数据来自XX产线的零件尺寸，每批抽10件，我想知道过程是否稳定以及能力是否达标..." style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;"></textarea>
+            </div>
+            <button id="generate-report-xs" style="margin-top: 10px; padding: 8px 15px; background-color: #5a67d8; color: white; border: none; border-radius: 4px; cursor: pointer;">生成 AI 提示词报告</button>
+            <div id="report-output-xs-container" style="margin-top: 15px; display: none;">
+                <label for="report-output-xs"><strong>AI 提示词报告 (请复制以下内容到 AI 对话框):</strong></label>
+                <textarea id="report-output-xs" rows="20" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background-color: #f9f9f9; white-space: pre-wrap;"></textarea>
+                <button id="copy-report-xs" style="margin-top: 5px; padding: 6px 12px;">复制报告</button>
+            </div>
+        </div>
+
         <details class="rules-card">
             <summary>查看控制图判异规则 (8项 - 主要应用于 Xbar 图)</summary>
             <ul>
@@ -282,6 +297,10 @@
                 }
                 const k = rawData.length; // Number of subgroups
                 const n = rawData[0].length; // Subgroup size (from the first subgroup)
+                
+                window.currentN_xs = n; // Store n for report
+                window.currentK_xs = k; // Store k for report
+
                 const warningContainer = document.getElementById('small-subgroup-warning');
                 if (warningContainer) { // 确保元素存在
                     warningContainer.classList.add('hidden'); // 先隐藏，以防上次显示过
@@ -311,9 +330,9 @@
                     }
                 }
                 if (n < 2) {
-                     throw new Error("子组大小 (n) 必须至少为 2。对于 S 图，通常建议 n >= 5 以获得更稳健的S估计。");
+                     throw new Error("子组大小 (n) 必须至少为 2。对于 S 图，通常建议 n >= 5 (或 n >= 10) 以获得更稳健的S估计。");
                 }
-                 if (k < 2) { // Technically k>=1 for Sbar, but for Xbar chart, k>=2 is better.
+                 if (k < 2) { 
                      throw new Error("Xbar-S 控制图至少需要 2 个子组。");
                  }
                 if (!rawData.every(subgroup => Array.isArray(subgroup) && subgroup.length === n)) {
@@ -333,53 +352,57 @@
                 if (!constants || constants.A3 === undefined || constants.B3 === undefined || constants.B4 === undefined || constants.c4 === undefined) {
                     throw new Error(`未找到子组大小 n=${n} 完整的 Xbar-S 控制图常数 (A3, B3, B4, c4)。请检查 spc-utils.js。`);
                 }
-                const { A3, B3, B4, c4, d2 } = constants; // d2 is included for reference display only
+                const { A3, B3, B4, c4, d2 } = constants; 
 
                 // --- Calculate Subgroup Statistics ---
                 xbarValues = rawData.map(subgroup => mean(subgroup));
-                sValues = rawData.map(subgroup => stdDev(subgroup, true)); // true for sample std dev (n-1 denominator)
+                sValues = rawData.map(subgroup => stdDev(subgroup, true)); 
                 const subgroupIndices = xbarValues.map((_, index) => index + 1);
 
                 // --- Calculate Overall Statistics ---
-                const xbarBar = mean(xbarValues); // X̿
-                const sBar = mean(sValues.filter(s_val => s_val > 0)); // S̄, average of non-zero subgroup std devs
-                                                              // If all sValues are 0, sBar will be NaN, handle this
+                const xbarBar = mean(xbarValues); 
+                const sBar = mean(sValues.filter(s_val => typeof s_val === 'number' && isFinite(s_val) && s_val >= 0)); // Ensure sBar is calculated from valid, non-negative S values
+                                                              
                 if (isNaN(xbarBar)) {
                     throw new Error("无法计算均值 X̿。请检查数据。");
                 }
-                if (isNaN(sBar) && sValues.some(s_val => s_val === 0) && sValues.every(s_val => s_val === 0 || isNaN(s_val))) {
-                    // All valid subgroups had zero standard deviation
-                    console.warn("所有子组的标准差均为0。S̄ 将为0，这可能导致控制限计算问题。");
-                    // sBar = 0; // Or handle as a special case if c4 is also zero (unlikely for n>=2)
-                } else if (isNaN(sBar)) {
-                    throw new Error("无法计算平均标准差 S̄。请检查数据。如果所有子组标准差都为0，也可能导致此问题。");
+                if (isNaN(sBar)) {
+                    if (sValues.every(s_val => s_val === 0 || isNaN(s_val))) {
+                         console.warn("所有子组的标准差均为0或无效。S̄ 将为0或NaN。");
+                         // sBar = 0; // Decide if setting sBar to 0 is appropriate, or let it be NaN and handle downstream
+                    } else {
+                         throw new Error("无法计算平均标准差 S̄。请检查数据。");
+                    }
                 }
+                
+                window.currentXbarBar_xs = xbarBar;
+                window.currentSBar_xs = sBar;
 
 
                 // --- Standard Deviation Estimates ---
-                // 1. Based on S̄/c₄ (Primary for Xbar-S charts)
-                const sigmaSbar = (c4 === 0 || sBar === 0) ? 0 : sBar / c4; // Avoid division by zero if c4 is 0 (should not happen for n>=2)
-                // 2. Overall sample standard deviation s_overall (using all data points)
-                const overallStdDevS_val = stdDev(allDataPoints, true); // s_overall
-                // 3. (Optional) Based on s_overall/c₄ - usually s_overall itself is used for Pp/Ppk
-                // const sigmaS_overall_est = (c4 === 0 || overallStdDevS_val === 0) ? 0 : overallStdDevS_val / c4;
+                const sigmaSbar = (c4 === 0 || sBar === 0 || isNaN(sBar)) ? 0 : sBar / c4; 
+                const overallStdDevS_val = stdDev(allDataPoints, true); 
+                
+                window.currentSigmaSbar_xs = sigmaSbar;
+                window.currentOverallStdDevS_xs = overallStdDevS_val;
 
 
                 // --- Control Limit Calculations ---
-                // Xbar Chart (using S̄)
                 const xUCL = xbarBar + A3 * sBar;
                 const xLCL = xbarBar - A3 * sBar;
-                // S Chart
                 const sUCL = B4 * sBar;
                 const sLCL = B3 * sBar;
 
-                // Sigma zones for Xbar chart (using sigmaSbar estimate for process sigma)
-                const sigma_Xbar_est = (n === 0 || sigmaSbar === 0 || n < 1) ? 0 : sigmaSbar / Math.sqrt(n);
+                const sigma_Xbar_est = (n === 0 || sigmaSbar === 0 || n < 1 || isNaN(sigmaSbar)) ? 0 : sigmaSbar / Math.sqrt(n);
                 const xUCL2Sigma = xbarBar + 2 * sigma_Xbar_est;
                 const xLCL2Sigma = xbarBar - 2 * sigma_Xbar_est;
                 const xUCL1Sigma = xbarBar + 1 * sigma_Xbar_est;
                 const xLCL1Sigma = xbarBar - 1 * sigma_Xbar_est;
 
+                window.currentXUCL_xs = xUCL; window.currentXLCL_xs = xLCL; window.currentXCL_xs = xbarBar;
+                window.currentXUCL2Sigma_xs = xUCL2Sigma; window.currentXLCL2Sigma_xs = xLCL2Sigma;
+                window.currentXUCL1Sigma_xs = xUCL1Sigma; window.currentXLCL1Sigma_xs = xLCL1Sigma;
+                window.currentSUCL_xs = sUCL; window.currentSLCL_xs = sLCL; window.currentSCL_xs = sBar;
 
                 // --- Process Capability (based on S̄/c₄) ---
                 const sigmaHat_Sbar = sigmaSbar;
@@ -388,31 +411,33 @@
                 const CpL_Sbar = (sigmaHat_Sbar === 0 || !isFinite(sigmaHat_Sbar) || LSL === null) ? NaN : (xbarBar - LSL) / (3 * sigmaHat_Sbar);
                 const Cpk_Sbar = Math.min(CpU_Sbar, CpL_Sbar);
 
+                window.currentCp_Sbar_xs = Cp_Sbar; window.currentCpk_Sbar_xs = Cpk_Sbar;
+                window.currentCpU_Sbar_xs = CpU_Sbar; window.currentCpL_Sbar_xs = CpL_Sbar;
+
                 // --- Process Performance (based on overall sample standard deviation s_overall) ---
                 const Pp = (overallStdDevS_val === 0 || !isFinite(overallStdDevS_val) || USL === null || LSL === null) ? NaN : (USL - LSL) / (6 * overallStdDevS_val);
                 const PpU = (overallStdDevS_val === 0 || !isFinite(overallStdDevS_val) || USL === null) ? NaN : (USL - xbarBar) / (3 * overallStdDevS_val);
                 const PpL = (overallStdDevS_val === 0 || !isFinite(overallStdDevS_val) || LSL === null) ? NaN : (xbarBar - LSL) / (3 * overallStdDevS_val);
                 const Ppk = Math.min(PpU, PpL);
 
+                window.currentPp_xs = Pp; window.currentPpk_xs = Ppk;
+                window.currentPpU_xs = PpU; window.currentPpL_xs = PpL;
 
                 // --- Update HTML Display - Basic Stats ---
                 safeSetText('subgroupSizeN', n);
                 safeSetText('subgroupCountK', k);
                 safeSetText('xbarBar', formatNum(xbarBar));
-                safeSetText('sBar', formatNum(sBar)); // Changed from rBar
-                safeSetText('sigmaSbar', formatNum(sigmaHat_Sbar)); // Changed from sigmaRbar
+                safeSetText('sBar', formatNum(sBar)); 
+                safeSetText('sigmaSbar', formatNum(sigmaHat_Sbar)); 
                 safeSetText('sampleStdDevS_overall', formatNum(overallStdDevS_val));
-                // safeSetText('sigmaS_overall', formatNum(sigmaS_overall_est));
                 safeSetText('usl', USL === null ? '未指定' : formatNum(USL));
                 safeSetText('lsl', LSL === null ? '未指定' : formatNum(LSL));
-                // Update constants display
                 safeSetText('constA3', A3.toFixed(3));
                 safeSetText('constB3', B3.toFixed(3));
                 safeSetText('constB4', B4.toFixed(3));
-                safeSetText('constc4', c4.toFixed(4)); // c4 often has more decimals
+                safeSetText('constc4', c4.toFixed(4)); 
                 safeSetText('constd2_ref', d2 ? d2.toFixed(3) : 'N/A');
 
-                // --- Update HTML Display - Control Limits ---
                 safeSetText('xbarCL', formatNum(xbarBar));
                 safeSetText('xbarUCL', formatNum(xUCL));
                 safeSetText('xbarLCL', formatNum(xLCL));
@@ -420,16 +445,14 @@
                 safeSetText('xbarLCL2Sigma', formatNum(xLCL2Sigma));
                 safeSetText('xbarUCL1Sigma', formatNum(xUCL1Sigma));
                 safeSetText('xbarLCL1Sigma', formatNum(xLCL1Sigma));
-                safeSetText('sCL', formatNum(sBar));   // Changed from rCL
-                safeSetText('sUCL', formatNum(sUCL)); // Changed from rUCL
-                safeSetText('sLCL', formatNum(sLCL)); // Changed from rLCL
+                safeSetText('sCL', formatNum(sBar));   
+                safeSetText('sUCL', formatNum(sUCL)); 
+                safeSetText('sLCL', formatNum(sLCL)); 
 
-                // --- Update HTML Display - Capability/Performance Table ---
-                safeSetText('cp-sbar-val', formatIndex(Cp_Sbar));     // Changed from cp-rbar-val
-                safeSetText('cp-sbar-eval', getEvaluation(Cp_Sbar));  // Changed from cp-rbar-eval
-                safeSetText('cpk-sbar-val', formatIndex(Cpk_Sbar));   // Changed from cpk-rbar-val
-                safeSetText('cpk-sbar-eval', getEvaluation(Cpk_Sbar));// Changed from cpk-rbar-eval
-                // Pp, Ppk remain the same as they are based on overall 's'
+                safeSetText('cp-sbar-val', formatIndex(Cp_Sbar));     
+                safeSetText('cp-sbar-eval', getEvaluation(Cp_Sbar));  
+                safeSetText('cpk-sbar-val', formatIndex(Cpk_Sbar));   
+                safeSetText('cpk-sbar-eval', getEvaluation(Cpk_Sbar));
                 safeSetText('pp-val', formatIndex(Pp));
                 safeSetText('pp-eval', getEvaluation(Pp));
                 safeSetText('ppk-val', formatIndex(Ppk));
@@ -438,17 +461,17 @@
                 // --- Normality Test ---
                 const numBins = sturgesRuleBins(allDataPoints);
                 const histData = histogramData(allDataPoints, numBins);
-                const curveData = generateNormalCurveData(allDataPoints, xbarBar, overallStdDevS_val); // Use overall s for normality curve
-                const skew = skewness(allDataPoints);
-                const kurt = kurtosis(allDataPoints);
-                safeSetText('skewness', formatIndex(skew, 3));
-                safeSetText('kurtosis', formatIndex(kurt, 3));
+                const curveData = generateNormalCurveData(allDataPoints, xbarBar, overallStdDevS_val); 
+                const skew_val = skewness(allDataPoints); // Renamed to avoid conflict
+                const kurt_val = kurtosis(allDataPoints); // Renamed to avoid conflict
+                safeSetText('skewness', formatIndex(skew_val, 3));
+                safeSetText('kurtosis', formatIndex(kurt_val, 3));
                 let normalityConclusionText = "数据分布形态: ";
-                 if (isNaN(skew) || isNaN(kurt)) {
+                 if (isNaN(skew_val) || isNaN(kurt_val)) {
                      normalityConclusionText += "<span style='color:grey'>数据不足或无变异，无法判断</span>";
-                 } else if (Math.abs(skew) < 0.5 && Math.abs(kurt) < 0.5) {
+                 } else if (Math.abs(skew_val) < 0.5 && Math.abs(kurt_val) < 0.5) {
                       normalityConclusionText += "<span style='color:green'>接近正态分布</span>";
-                 } else if (Math.abs(skew) < 1 && Math.abs(kurt) < 1) {
+                 } else if (Math.abs(skew_val) < 1 && Math.abs(kurt_val) < 1) {
                       normalityConclusionText += "<span style='color:orange'>轻微偏离正态</span>";
                  } else {
                       normalityConclusionText += "<span style='color:red'>显著偏离正态</span> (可能影响过程能力指数 Cp/Cpk 的准确性)";
@@ -458,20 +481,23 @@
 
 
                 // --- Process Stability Analysis (Sigma Rules on Xbar Chart) ---
-                // sigma_Xbar_est is the std dev for Xbar values
                 const ruleCheckResult = checkControlChartRules(xbarValues, xbarBar, sigma_Xbar_est);
                 const violations = ruleCheckResult.violations;
                 const ruleDescriptions = ruleCheckResult.descriptions;
+                window.currentXSViolations = violations; // Store for report
+                window.currentXSRuleDescriptions = ruleDescriptions; // Store for report
+
                 const xPointsViolatingRulesIndices = [...new Set(Object.values(violations).flat())].sort((a, b) => a - b);
 
-                // Check S chart for out-of-control points
                 let sPointsOutOfControlIndices = sValues.reduce((acc, val, index) => {
-                    if (val > sUCL || (sLCL > 0 && val < sLCL)) acc.push(index); // Check LCL only if > 0
+                    if (val > sUCL || (sLCL > 0 && val < sLCL)) acc.push(index); 
                     return acc;
                 }, []);
+                window.currentSViolationsIndices = sPointsOutOfControlIndices; // Store for report
+
 
                 let isXbarStable = xPointsViolatingRulesIndices.length === 0;
-                let isSStable = sPointsOutOfControlIndices.length === 0; // Changed from isRStable
+                let isSStable = sPointsOutOfControlIndices.length === 0; 
                 let stableMessage = "";
                 const violationsListDiv = document.getElementById('violations-list');
                 if (violationsListDiv) violationsListDiv.innerHTML = '';
@@ -517,7 +543,7 @@
                  }
                  if (typeof Ppk === 'number' && isFinite(Ppk)) {
                      interpretationText += ` 过程性能指数 Ppk (基于s<sub>overall</sub>) 为 ${formatIndex(Ppk)}，${getEvaluation(Ppk)}。`;
-                     if (isFinite(Cpk_Sbar) && isFinite(Ppk) && Math.abs(Cpk_Sbar - Ppk) > 0.2) { // Compare Cpk_Sbar with Ppk
+                     if (isFinite(Cpk_Sbar) && isFinite(Ppk) && Math.abs(Cpk_Sbar - Ppk) > 0.2) { 
                          interpretationText += ` Cpk 和 Ppk 差异可能较大 (${formatIndex(Cpk_Sbar)} vs ${formatIndex(Ppk)})，提示可能存在过程偏移或未解释的变异源。`;
                      }
                  } else if (USL !== null || LSL !== null) {
@@ -529,10 +555,10 @@
 
                 // --- ECharts Initialization ---
                 initializeControlCharts(
-                    subgroupIndices, xbarValues, sValues, // Pass sValues instead of rValues
+                    subgroupIndices, xbarValues, sValues, 
                     xbarBar, xUCL, xLCL, xUCL2Sigma, xLCL2Sigma, xUCL1Sigma, xLCL1Sigma,
-                    sBar, sUCL, sLCL, // Pass S chart limits
-                    USL, LSL, violations, sPointsOutOfControlIndices // Pass S chart violations
+                    sBar, sUCL, sLCL, 
+                    USL, LSL, violations, sPointsOutOfControlIndices 
                 );
                 initializeNormalityChart(histData, curveData, xbarBar, overallStdDevS_val, USL, LSL);
 
@@ -545,15 +571,15 @@
 
         // --- Chart Initialization Functions ---
         function initializeControlCharts(
-            indices, xData, sData, // Changed rData to sData
+            indices, xData, sData, 
             xCL, xUCL, xLCL, xUCL2Sigma, xLCL2Sigma, xUCL1Sigma, xLCL1Sigma,
-            sCL, sUCL, sLCL, // Changed rCL, rUCL, rLCL to sCL, sUCL, sLCL
+            sCL, sUCL, sLCL, 
             specUSL, specLSL,
             xViolations,
-            sIndicesOutOfControl // Changed rIndicesOutOfControl to sIndicesOutOfControl
+            sIndicesOutOfControl 
             ) {
                      const xbarChartElement = document.getElementById('xbar-chart-container');
-                     const sChartElement = document.getElementById('s-chart-container'); // Changed r-chart-container to s-chart-container
+                     const sChartElement = document.getElementById('s-chart-container'); 
 
                      if (!xbarChartElement || !sChartElement) {
                          console.error("控制图容器元素未找到!");
@@ -564,7 +590,7 @@
                      echarts.dispose(sChartElement);
 
                      const xbarChart = echarts.init(xbarChartElement);
-                     const sChart = echarts.init(sChartElement); // Changed rChart to sChart
+                     const sChart = echarts.init(sChartElement); 
 
                      const commonTooltip = {
                         trigger: 'axis', axisPointer: { type: 'cross' },
@@ -576,16 +602,16 @@
                             if (xData[index] !== undefined && isFinite(xData[index])) {
                                 tooltip += `Xbar: ${formatNum(xData[index])}<br/>`;
                             }
-                            if (sData[index] !== undefined && isFinite(sData[index])) { // Changed rData to sData
-                                tooltip += `S: ${formatNum(sData[index])}<br/>`; // Changed R to S
+                            if (sData[index] !== undefined && isFinite(sData[index])) { 
+                                tooltip += `S: ${formatNum(sData[index])}<br/>`; 
                             }
                              for (const ruleNum in xViolations) {
                                  if (xViolations[ruleNum].includes(index)) {
                                       tooltip += `<span style="color:red;">Xbar违规: 规则 ${ruleNum}</span><br/>`;
                                  }
                              }
-                             if (sIndicesOutOfControl.includes(index)) { // Changed rIndicesOutOfControl
-                                  tooltip += `<span style="color:red;">S图: 超出控制限</span><br/>`; // Changed R图 to S图
+                             if (sIndicesOutOfControl.includes(index)) { 
+                                  tooltip += `<span style="color:red;">S图: 超出控制限</span><br/>`; 
                              }
                             return tooltip;
                         }
@@ -656,54 +682,55 @@
                         dataZoom: [ { type: 'inside', start: 0, end: 100 }, { type: 'slider', height: 20, bottom: 10 } ]
                     };
 
-                    // --- S Chart Y-axis Scaling Logic ---
-                     const sDataValid = sData.filter(isFinite); // Changed rDataValid to sDataValid
-                     // S chart LCL can be 0, so min value for data can be 0.
-                     const sDataMin = sDataValid.length > 0 ? Math.min(...sDataValid, (isFinite(sLCL) && sLCL >= 0 ? sLCL : Infinity) ) : (isFinite(sCL)? sCL: 0);
-                     const sDataMax = sDataValid.length > 0 ? Math.max(...sDataValid) : (isFinite(sCL)? sCL: 0);
-                     const sCoreMax = Math.max(sDataMax, isFinite(sUCL) ? sUCL : -Infinity);
-                     // S chart LCL can be > 0. If sLCL is defined and >0, it should be the floor for the y-axis.
-                     const sMinY = (isFinite(sLCL) && sLCL > 0) ? Math.min(sDataMin, sLCL) * 0.9 : 0; // Start from 0 or slightly below LCL if LCL > 0
-                     const sRange = sCoreMax - sMinY;
-                     const sBuffer = Math.max(sRange * 0.15, Math.abs(sCL)*0.1, 0.001);
-                     let sMaxY = sCoreMax + sBuffer;
-                     if (!isFinite(sMaxY) || sMaxY <= sMinY) sMaxY = (isFinite(sDataMax)? sDataMax : 0.1) + sBuffer;
-                     if (sMaxY <= sMinY) sMaxY = sMinY + 0.1; // Ensure maxY is greater than minY
+                    const sDataValid = sData.filter(isFinite); 
+                    const sDataMinVal = sDataValid.length > 0 ? Math.min(...sDataValid) : (isFinite(sCL)? sCL : 0);
+                    const sDataMaxVal = sDataValid.length > 0 ? Math.max(...sDataValid) : (isFinite(sCL)? sCL : 0);
 
-                    // --- S Chart MarkPoint Data ---
-                    const sMarkPointData = getViolationMarkPoints(sData, sIndicesOutOfControl, { ucl: sUCL, lcl: sLCL }); // Changed rMarkPointData
+                    let yMin_S = 0; // S chart typically starts at 0
+                    if (isFinite(sLCL) && sLCL > 0) {
+                        yMin_S = Math.min(sDataMinVal, sLCL) * 0.9; // Or some buffer below LCL if LCL > 0
+                        if (yMin_S < 0) yMin_S = 0; // Ensure it doesn't go below 0
+                    }
+                    
+                    const coreMax_S = Math.max(sDataMaxVal, isFinite(sUCL) ? sUCL : -Infinity);
+                    const coreRange_S = coreMax_S - yMin_S;
+                    const buffer_S = Math.max(coreRange_S * 0.15, Math.abs(sCL)*0.1, 0.001); // Ensure some buffer
+                    let yMax_S = coreMax_S + buffer_S;
+                    if (!isFinite(yMax_S) || yMax_S <= yMin_S) yMax_S = yMin_S + (Math.abs(sCL || 0.1) * 0.2 || 0.1); // Handle edge cases
 
-                    const sOption = { // Changed rOption to sOption
+
+                    const sMarkPointData = getViolationMarkPoints(sData, sIndicesOutOfControl, { ucl: sUCL, lcl: sLCL }); 
+
+                    const sOption = { 
                         tooltip: commonTooltip,
                         grid: { left: '12%', right: '8%', bottom: '15%', top: '10%', containLabel: false },
                         xAxis: { type: 'category', data: indices, name: '子组序号', nameLocation: 'middle', nameGap: 35 },
-                        yAxis: { type: 'value', name: 'S 值 (子组标准差)', nameLocation: 'middle', nameGap: 65, min: formatNum(sMinY, 5), max: formatNum(sMaxY, 5), axisLabel: { formatter: (value) => value.toFixed(4) } },
+                        yAxis: { type: 'value', name: 'S 值 (子组标准差)', nameLocation: 'middle', nameGap: 65, min: formatNum(yMin_S, 5), max: formatNum(yMax_S, 5), axisLabel: { formatter: (value) => value.toFixed(4) } },
                         series: [{
-                            name: 'S', type: 'line', data: sData, symbolSize: 7, // Changed R to S, rData to sData
-                            lineStyle: { color: '#d97706', width: 2 }, itemStyle: { color: '#d97706' }, // Different color for S chart
+                            name: 'S', type: 'line', data: sData, symbolSize: 7, 
+                            lineStyle: { color: '#d97706', width: 2 }, itemStyle: { color: '#d97706' }, 
                             markLine: {
                                 silent: true, ...markLineStyle,
                                 data: [
                                     { name: 'CL', yAxis: sCL, lineStyle: { color: 'blue', type: 'solid', width: 1 } },
                                     { name: 'UCL', yAxis: sUCL, lineStyle: { color: 'red', type: 'solid' } },
-                                    ...(sLCL > 0 && isFinite(sLCL) ? [{ name: 'LCL', yAxis: sLCL, lineStyle: { color: 'red', type: 'solid' } }] : []) // Conditionally show LCL for S chart
+                                    ...(sLCL > 0 && isFinite(sLCL) ? [{ name: 'LCL', yAxis: sLCL, lineStyle: { color: 'red', type: 'solid' } }] : []) 
                                 ]
                             },
-                             markPoint: { ...markPointStyle, data: sMarkPointData } // Changed rMarkPointData
+                             markPoint: { ...markPointStyle, data: sMarkPointData } 
                         }],
                         dataZoom: [ { type: 'inside', start: 0, end: 100 }, { type: 'slider', height: 20, bottom: 10 } ]
                     };
 
                     xbarChart.setOption(xbarOption, true);
-                    sChart.setOption(sOption, true); // Changed rChart.setOption to sChart.setOption
-                    echarts.connect([xbarChart, sChart]); // Connect Xbar and S charts
+                    sChart.setOption(sOption, true); 
+                    echarts.connect([xbarChart, sChart]); 
 
                     window.currentCharts = window.currentCharts || {};
                     window.currentCharts.xbar = xbarChart;
-                    window.currentCharts.s = sChart; // Changed r to s
+                    window.currentCharts.s = sChart; 
                 }
 
-        // Normality Chart Initialization (Can be copied from X-R script, ensure it uses overallStdDevS_val for curve)
         function initializeNormalityChart(histData, curveData, dataMean, dataStdDev_overall, specUSL, specLSL) {
             const chartElement = document.getElementById('normality-chart-container');
             if (!chartElement) { console.error("正态性图表容器未找到!"); return; }
@@ -753,6 +780,95 @@
             window.currentCharts.normality = normalityChart;
         }
 
+        // --- AI Report Generation Function ---
+        function generateXSReportText(results, userContext) {
+            const na = '未设置';
+            let report = `# SPC 分析报告 (Xbar-S 图)\n\n`;
+            report += `## 报告生成时间\n${getCurrentTimestamp()}\n\n`;
+
+            report += `## 1. 基本统计信息\n`;
+            report += `- 子组大小 (n): ${results.n || na}\n`;
+            report += `- 子组数量 (k): ${results.k || na}\n`;
+            report += `- 总数据点数 (N): ${(results.n && results.k) ? results.n * results.k : na}\n`;
+            report += `- Xbar 均值 (X̿): ${formatNum(results.xbarBar)}\n`;
+            report += `- S 均值 (S̄): ${formatNum(results.sBar)}\n`;
+            report += `- 过程标准差估计 (σ̂ = S̄/c₄): ${formatNum(results.sigmaSbar)}\n`;
+            report += `- 整体样本标准差 (s_overall): ${formatNum(results.overallStdDevS)}\n\n`;
+
+            report += `## 2. 规格限 (用户输入)\n`;
+            report += `- 规格上限 (USL): ${results.USL === null ? na : formatNum(results.USL)}\n`;
+            report += `- 规格下限 (LSL): ${results.LSL === null ? na : formatNum(results.LSL)}\n\n`;
+
+            report += `## 3. 控制限\n`;
+            report += `### 3.1. 均值 (Xbar) 图 (基于S̄)\n`;
+            report += `- 上控制限 (UCLx): ${formatNum(results.xUCL)}\n`;
+            report += `- 中心线 (CLx): ${formatNum(results.xCL)}\n`;
+            report += `- 下控制限 (LCLx): ${formatNum(results.xLCL)}\n`;
+            report += `- +2σ_xbar 区间: [${formatNum(results.xLCL2Sigma)}, ${formatNum(results.xUCL2Sigma)}]\n`;
+            report += `- +1σ_xbar 区间: [${formatNum(results.xLCL1Sigma)}, ${formatNum(results.xUCL1Sigma)}]\n`;
+            report += `### 3.2. 标准差 (S) 图\n`;
+            report += `- 上控制限 (UCLs): ${formatNum(results.sUCL)}\n`;
+            report += `- 中心线 (CLs): ${formatNum(results.sCL)}\n`;
+            report += `- 下控制限 (LCLs): ${formatNum(results.sLCL)}\n\n`;
+
+            report += `## 4. 正态性检验 (基于所有个体值)\n`;
+            report += `- 偏度 (Skewness): ${formatIndex(results.skewness, 3)}\n`;
+            report += `- 峰度 (Kurtosis): ${formatIndex(results.kurtosis, 3)}\n`;
+            report += `- 结论: ${results.normalityConclusionText.replace(/<[^>]*>/g, '')}\n\n`;
+
+            report += `## 5. 过程稳定性分析 (基于Xbar-S图和8项判异规则)\n`;
+            report += `- 整体结论: ${results.stabilityMessage.replace(/<[^>]*>/g, '')}\n`;
+            report += `### 5.1. Xbar 图西格玛规则违规详情:\n`;
+            if (results.xViolations && Object.keys(results.xViolations).length > 0) {
+                const violatedRuleNumbers = Object.keys(results.xViolations).map(Number).sort((a,b)=>a-b);
+                violatedRuleNumbers.forEach(ruleNum => {
+                    const indices = results.xViolations[ruleNum]; 
+                    const displayIndices = indices.map(i => i + 1).join(', ');
+                    const valuesForRule = indices.map(i => formatNum(results.xbarValues[i], 4)).join(', ');
+                    report += `  - 规则 ${ruleNum} (${results.ruleDescriptions[ruleNum]}): 子组 ${displayIndices} (对应Xbar值 ${valuesForRule})\n`;
+                });
+            } else {
+                report += `  无违规点。\n`;
+            }
+
+            report += `### 5.2. S 图超出控制限点:\n`;
+            if (results.sPointsOutOfControlIndices && results.sPointsOutOfControlIndices.length > 0) {
+                const sDisplayIndices = results.sPointsOutOfControlIndices.map(i => i + 1).join(', ');
+                const sViolatingValues = results.sPointsOutOfControlIndices.map(i => formatNum(results.sValues[i], 4)).join(', ');
+                report += `  - 点 ${sDisplayIndices} (对应S值 ${sViolatingValues})\n`;
+            } else {
+                report += `  无违规点。\n`;
+            }
+            report += `\n`;
+
+            report += `## 6. 过程能力/性能分析\n`;
+            if (results.USL === null || results.LSL === null) {
+                report += `未提供规格上限(USL)和规格下限(LSL)，无法计算过程能力及性能指数。\n`;
+            } else {
+                report += `### 6.1. 过程能力 (基于组内变异 σ̂ = S̄/c₄)\n`;
+                report += `  - Cp: ${formatIndex(results.Cp_Sbar)}\n`;
+                report += `  - Cpk: ${formatIndex(results.Cpk_Sbar)} (评价: ${getEvaluation(results.Cpk_Sbar)})\n`;
+                report += `  - Cpu: ${formatIndex(results.CpU_Sbar)}\n`;
+                report += `  - Cpl: ${formatIndex(results.CpL_Sbar)}\n`;
+                report += `### 6.2. 过程性能 (基于整体变异 s_overall)\n`;
+                report += `  - Pp: ${formatIndex(results.Pp)}\n`;
+                report += `  - Ppk: ${formatIndex(results.Ppk)} (评价: ${getEvaluation(results.Ppk)})\n`;
+                report += `  - Ppu: ${formatIndex(results.PpU)}\n`;
+                report += `  - Ppl: ${formatIndex(results.PpL)}\n`;
+                let capPerfInterpretation = results.interpretationTextShort || "请结合具体指标判断。";
+                if (isFinite(results.Cpk_Sbar) && isFinite(results.Ppk) && Math.abs(results.Cpk_Sbar - results.Ppk) > 0.2) {
+                     capPerfInterpretation += ` Cpk (基于S̄/c₄) 和 Ppk (基于s_overall) 存在显著差异 (${formatIndex(results.Cpk_Sbar)} vs ${formatIndex(results.Ppk)})，这可能表明过程中存在特殊原因导致的变异，或过程均值相对规格中心有偏移，或者组间变异较大。当过程仅受普通原因影响且稳定时，Cpk 和 Ppk 会比较接近。`;
+                }
+                 report += `### 6.3. 能力/性能解读:\n${capPerfInterpretation}\n`;
+            }
+            report += `\n`;
+
+            report += `## 7. 用户补充信息\n`;
+            report += `${userContext || '用户未提供额外上下文信息。'}\n`;
+
+            return report;
+        }
+
 
         // --- Initialization and Event Listeners ---
         document.addEventListener('DOMContentLoaded', (event) => {
@@ -782,10 +898,75 @@
                   displayError("错误: 无法加载或解析所需数据 - " + error.message + "。请确保从首页正确导航。" + (error.stack ? `<br><pre>${error.stack}</pre>`: ""));
                   return;
             }
+            
+            const generateReportBtnXS = document.getElementById('generate-report-xs');
+            const reportOutputContainerXS = document.getElementById('report-output-xs-container');
+            const reportOutputTextareaXS = document.getElementById('report-output-xs');
+            const userContextTextareaXS = document.getElementById('user-context-xs');
+            const copyReportBtnXS = document.getElementById('copy-report-xs');
+
+            if (generateReportBtnXS) {
+                generateReportBtnXS.addEventListener('click', function() {
+                    if (typeof window.currentXbarBar_xs === 'undefined') { 
+                        alert("请先等待分析结果加载完成。");
+                        return;
+                    }
+                    const userContext = userContextTextareaXS.value.trim();
+                    const results = {
+                        n: window.currentN_xs, 
+                        k: window.currentK_xs,
+                        xbarBar: window.currentXbarBar_xs,
+                        sBar: window.currentSBar_xs,
+                        sigmaSbar: window.currentSigmaSbar_xs,
+                        overallStdDevS: window.currentOverallStdDevS_xs,
+                        USL: USL, 
+                        LSL: LSL,
+                        xUCL: window.currentXUCL_xs, xCL: window.currentXCL_xs, xLCL: window.currentXLCL_xs,
+                        xUCL2Sigma: window.currentXUCL2Sigma_xs, xLCL2Sigma: window.currentXLCL2Sigma_xs,
+                        xUCL1Sigma: window.currentXUCL1Sigma_xs, xLCL1Sigma: window.currentXLCL1Sigma_xs,
+                        sUCL: window.currentSUCL_xs, sCL: window.currentSCL_xs, sLCL: window.currentSLCL_xs,
+                        skewness: skewness(allDataPoints), 
+                        kurtosis: kurtosis(allDataPoints),
+                        normalityConclusionText: document.getElementById('normality-conclusion') ? document.getElementById('normality-conclusion').innerHTML : "N/A",
+                        stabilityMessage: document.getElementById('stability-analysis') ? document.getElementById('stability-analysis').innerHTML : "N/A",
+                        xViolations: window.currentXSViolations || {},
+                        ruleDescriptions: window.currentXSRuleDescriptions || {},
+                        xbarValues: xbarValues, 
+                        sPointsOutOfControlIndices: window.currentSViolationsIndices || [],
+                        sValues: sValues, 
+                        Cp_Sbar: window.currentCp_Sbar_xs, Cpk_Sbar: window.currentCpk_Sbar_xs,
+                        CpU_Sbar: window.currentCpU_Sbar_xs, CpL_Sbar: window.currentCpL_Sbar_xs,
+                        Pp: window.currentPp_xs, Ppk: window.currentPpk_xs,
+                        PpU: window.currentPpU_xs, PpL: window.currentPpL_xs,
+                        interpretationTextShort: document.getElementById('interpretation') ? document.getElementById('interpretation').textContent.split('。')[0] + '。' : "N/A"
+                    };
+                    const reportText = generateXSReportText(results, userContext);
+                    reportOutputTextareaXS.value = reportText;
+                    reportOutputContainerXS.style.display = 'block';
+                });
+            }
+
+            if (copyReportBtnXS) {
+                copyReportBtnXS.addEventListener('click', function() {
+                    reportOutputTextareaXS.select();
+                    try {
+                        document.execCommand('copy'); 
+                        alert('报告已复制到剪贴板！');
+                    } catch (err) {
+                        navigator.clipboard.writeText(reportOutputTextareaXS.value).then(function() {
+                            alert('报告已复制到剪贴板！');
+                        }, function(clipboardErr) {
+                            alert('复制失败，请手动复制。');
+                            console.error('Clipboard API copy failed: ', clipboardErr);
+                        });
+                    }
+                });
+            }
+
 
             window.addEventListener('resize', () => {
                 if (window.currentCharts?.xbar) window.currentCharts.xbar.resize();
-                if (window.currentCharts?.s) window.currentCharts.s.resize(); // Changed r to s
+                if (window.currentCharts?.s) window.currentCharts.s.resize(); 
                 if (window.currentCharts?.normality) window.currentCharts.normality.resize();
            });
         });

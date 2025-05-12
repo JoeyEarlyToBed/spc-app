@@ -279,7 +279,7 @@
                             analysisType = 'imr';
                         } else if (isConsistentSize && n_parsed >= 2 && k_parsed >= 2) { // Clear subgroup structure
                             data = rawDataArrays.map(row => row.filter(val => !isNaN(val)));
-                            analysisType = (n_parsed >= 5) ? 'xs' : 'xr'; // Default: n >= 5 use X-S
+                            analysisType = (n_parsed >= 10) ? 'xs' : 'xr'; // Default: n >= 5 use X-S
                         } else if (!isConsistentSize && k_parsed > 1) {
                              throw new Error("自动判断失败：检测到数据每行的观测值数量不一致。对于 X-R/X-S 图，所有子组大小必须相同。请手动选择图表类型或修正数据。");
                         } else {

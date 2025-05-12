@@ -220,6 +220,19 @@
             <p><strong>过程性能分析 (基于 s):</strong> <span id="performance-analysis">N/A</span></p>
              <p style="margin-top: 1rem;"><strong>控制图解释:</strong> <span id="interpretation">N/A</span></p>
         </div>
+        <div id="ai-assist-section-xr" style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee;">
+            <h3>AI 辅助分析与建议</h3>
+            <div>
+                <label for="user-context-xr"><strong>补充应用场景或具体问题 (可选):</strong></label>
+                <textarea id="user-context-xr" rows="3" placeholder="例如：这些数据来自XX产线的轴承内径，每小时抽5件，我想知道过程是否稳定..." style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;"></textarea>
+            </div>
+            <button id="generate-report-xr" style="margin-top: 10px; padding: 8px 15px; background-color: #2b6cb0; color: white; border: none; border-radius: 4px; cursor: pointer;">生成 AI 提示词报告</button>
+            <div id="report-output-xr-container" style="margin-top: 15px; display: none;">
+                <label for="report-output-xr"><strong>AI 提示词报告 (请复制以下内容到 AI 对话框):</strong></label>
+                <textarea id="report-output-xr" rows="20" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background-color: #f9f9f9; white-space: pre-wrap;"></textarea>
+                <button id="copy-report-xr" style="margin-top: 5px; padding: 6px 12px;">复制报告</button>
+            </div>
+        </div>
         <details class="rules-card">
             <summary>查看控制图判异规则 (8项)</summary>
             <ul>
@@ -268,6 +281,14 @@
         let rValues = [];
         let allDataPoints = []; // Flattened 1D array for normality test
 
+        let xbarBar, rBar, sigmaRbar, sigmaS_pooled, overallStdDevS_val;
+        let xUCL, xLCL, xUCL2Sigma, xLCL2Sigma, xUCL1Sigma, xLCL1Sigma;
+        let rUCL, rCL, rLCL;
+        let Cp_Rbar, Cpk_Rbar, CpU_Rbar, CpL_Rbar;
+        let Cp_S_pooled, Cpk_S_pooled, CpU_S_pooled, CpL_S_pooled;
+        let Pp, Ppk, PpU, PpL;
+        let currentN, currentK; // 用于报告
+
         // *** 新增: 辅助函数，用于安全更新DOM ***
         function safeSetText(id, value) {
             const element = document.getElementById(id);
@@ -296,6 +317,10 @@
                 }
                 const k = rawData.length; // 子组数量
                 const n = rawData[0].length; // 子组大小 (从第一个子组获取)
+                
+                window.currentN_xr = n; // Store n for report
+                window.currentK_xr = k; // Store k for report
+
                 if (n < 2) {
                      throw new Error("子组大小 (n) 必须至少为 2。");
                 }
@@ -511,6 +536,38 @@
                  // --- ECharts 初始化 ---
                  initializeControlCharts(subgroupIndices, xbarValues, rValues, xbarBar, xUCL, xLCL, xUCL2Sigma, xLCL2Sigma, xUCL1Sigma, xLCL1Sigma, rBar, rUCL, rLCL, USL, LSL, violations, rPointsOutOfControlIndices);
                  initializeNormalityChart(histData, curveData, xbarBar, overallStdDevS, USL, LSL); // Use overallStdDevS for normality curve
+
+                // Store values in window for report generation
+                window.currentXbarBar_xr = xbarBar;
+                window.currentRBar_xr = rBar;
+                window.currentSigmaRbar_xr = sigmaRbar;
+                window.currentSigmaS_xr = sigmaS;
+                window.currentOverallStdDevS_xr = overallStdDevS;
+                window.currentXUCL_xr = xUCL;
+                window.currentXCL_xr = xbarBar;
+                window.currentXLCL_xr = xLCL;
+                window.currentXUCL2Sigma_xr = xUCL2Sigma;
+                window.currentXLCL2Sigma_xr = xLCL2Sigma;
+                window.currentXUCL1Sigma_xr = xUCL1Sigma;
+                window.currentXLCL1Sigma_xr = xLCL1Sigma;
+                window.currentRUCL_xr = rUCL;
+                window.currentRCL_xr = rBar;
+                window.currentRLCL_xr = rLCL;
+                window.currentCp_Rbar_xr = Cp_Rbar;
+                window.currentCpk_Rbar_xr = Cpk_Rbar;
+                window.currentCpU_Rbar_xr = CpU_Rbar;
+                window.currentCpL_Rbar_xr = CpL_Rbar;
+                window.currentCp_S_xr = Cp_S;
+                window.currentCpk_S_xr = Cpk_S;
+                window.currentCpU_S_xr = CpU_S;
+                window.currentCpL_S_xr = CpL_S;
+                window.currentPp_xr = Pp;
+                window.currentPpk_xr = Ppk;
+                window.currentPpU_xr = PpU;
+                window.currentPpL_xr = PpL;
+                window.currentXRViolations = violations;
+                window.currentXRRuleDescriptions = ruleDescriptions;
+                window.currentRViolationsIndices = rPointsOutOfControlIndices;
 
             } catch (error) {
                 console.error("计算或显示过程中发生错误:", error);
@@ -744,7 +801,97 @@
                     window.currentCharts = window.currentCharts || {};
                     window.currentCharts.normality = normalityChart;
                 }
+        // --- AI 报告生成相关 ---
+        function generateXRReportText(results, userContext) {
+            const na = '未设置';
+            let report = `# SPC 分析报告 (Xbar-R 图)\n\n`;
+            report += `## 报告生成时间\n${getCurrentTimestamp()}\n\n`;
 
+            report += `## 1. 基本统计信息\n`;
+            report += `- 子组大小 (n): ${results.n || na}\n`;
+            report += `- 子组数量 (k): ${results.k || na}\n`;
+            report += `- 总数据点数 (N): ${results.N || na}\n`;
+            report += `- Xbar 均值 (X̿): ${formatNum(results.xbarBar)}\n`;
+            report += `- R 均值 (R̄): ${formatNum(results.rBar)}\n`;
+            report += `- 过程标准差估计 (σ̂ = R̄/d₂): ${formatNum(results.sigmaRbar)}\n`;
+            report += `- (参考)过程标准差估计 (σ̂ = s_pooled/c₄): ${formatNum(results.sigmaS)}\n`; // sigmaS 来自 s_pooled/c4
+            report += `- 整体样本标准差 (s_overall): ${formatNum(results.overallStdDevS)}\n\n`;
+
+            report += `## 2. 规格限 (用户输入)\n`;
+            report += `- 规格上限 (USL): ${results.USL === null ? na : formatNum(results.USL)}\n`;
+            report += `- 规格下限 (LSL): ${results.LSL === null ? na : formatNum(results.LSL)}\n\n`;
+
+            report += `## 3. 控制限\n`;
+            report += `### 3.1. 均值 (Xbar) 图\n`;
+            report += `- 上控制限 (UCLx): ${formatNum(results.xUCL)}\n`;
+            report += `- 中心线 (CLx): ${formatNum(results.xbarBar)}\n`;
+            report += `- 下控制限 (LCLx): ${formatNum(results.xLCL)}\n`;
+            report += `- +2σ_xbar 区间: [${formatNum(results.xLCL2Sigma)}, ${formatNum(results.xUCL2Sigma)}]\n`;
+            report += `- +1σ_xbar 区间: [${formatNum(results.xLCL1Sigma)}, ${formatNum(results.xUCL1Sigma)}]\n`;
+            report += `### 3.2. 极差 (R) 图\n`;
+            report += `- 上控制限 (UCLr): ${formatNum(results.rUCL)}\n`;
+            report += `- 中心线 (CLr): ${formatNum(results.rBar)}\n`;
+            report += `- 下控制限 (LCLr): ${formatNum(results.rLCL)}\n\n`;
+
+            report += `## 4. 正态性检验 (基于所有个体值)\n`;
+            report += `- 偏度 (Skewness): ${formatIndex(results.skewness, 3)}\n`;
+            report += `- 峰度 (Kurtosis): ${formatIndex(results.kurtosis, 3)}\n`;
+            report += `- 结论: ${results.normalityConclusionText.replace(/<[^>]*>/g, '')}\n\n`;
+
+            report += `## 5. 过程稳定性分析 (基于Xbar-R图和8项判异规则)\n`;
+            report += `- 整体结论: ${results.stabilityMessage.replace(/<[^>]*>/g, '')}\n`;
+
+            report += `### 5.1. Xbar 图西格玛规则违规详情:\n`;
+            if (Object.keys(results.xViolations).length > 0) {
+                const violatedRuleNumbers = Object.keys(results.xViolations).map(Number).sort((a,b)=>a-b);
+                violatedRuleNumbers.forEach(ruleNum => {
+                    const indices = results.xViolations[ruleNum]; // 0-based indices
+                    const displayIndices = indices.map(i => i + 1).join(', ');
+                    const valuesForRule = indices.map(i => formatNum(results.xbarValues[i], 4)).join(', ');
+                    report += `  - 规则 ${ruleNum} (${results.ruleDescriptions[ruleNum]}): 子组 ${displayIndices} (对应Xbar值 ${valuesForRule})\n`;
+                });
+            } else {
+                report += `  无违规点。\n`;
+            }
+
+            report += `### 5.2. R 图超出控制限点:\n`;
+            if (results.rPointsOutOfControlIndices && results.rPointsOutOfControlIndices.length > 0) {
+                const rDisplayIndices = results.rPointsOutOfControlIndices.map(i => i + 1).join(', ');
+                const rViolatingValues = results.rPointsOutOfControlIndices.map(i => formatNum(results.rValues[i], 4)).join(', ');
+                report += `  - 点 ${rDisplayIndices} (对应R值 ${rViolatingValues})\n`;
+            } else {
+                report += `  无违规点。\n`;
+            }
+            report += `\n`;
+
+            report += `## 6. 过程能力/性能分析\n`;
+            if (results.USL === null || results.LSL === null) {
+                report += `未提供规格上限(USL)和规格下限(LSL)，无法计算过程能力及性能指数。\n`;
+            } else {
+                report += `### 6.1. 过程能力 (基于组内变异 σ̂ = R̄/d₂)\n`;
+                report += `  - Cp: ${formatIndex(results.Cp_Rbar)}\n`;
+                report += `  - Cpk: ${formatIndex(results.Cpk_Rbar)} (评价: ${getEvaluation(results.Cpk_Rbar)})\n`;
+                report += `  - Cpu: ${formatIndex(results.CpU_Rbar)}\n`;
+                report += `  - Cpl: ${formatIndex(results.CpL_Rbar)}\n`;
+                report += `### 6.2. 过程能力 (基于组内变异 σ̂ = s_pooled/c₄)\n`;
+                report += `  - Cp (基于s_pooled): ${formatIndex(results.Cp_S)}\n`;
+                report += `  - Cpk (基于s_pooled): ${formatIndex(results.Cpk_S)} (评价: ${getEvaluation(results.Cpk_S)})\n`;
+                report += `  - Cpu (基于s_pooled): ${formatIndex(results.CpU_S)}\n`;
+                report += `  - Cpl (基于s_pooled): ${formatIndex(results.CpL_S)}\n`;
+                report += `### 6.3. 过程性能 (基于整体变异 s_overall)\n`;
+                report += `  - Pp: ${formatIndex(results.Pp)}\n`;
+                report += `  - Ppk: ${formatIndex(results.Ppk)} (评价: ${getEvaluation(results.Ppk)})\n`;
+                report += `  - Ppu: ${formatIndex(results.PpU)}\n`;
+                report += `  - Ppl: ${formatIndex(results.PpL)}\n`;
+                report += `### 6.4. 能力/性能解读:\n${results.interpretationTextShort || "请结合具体指标判断。"}\n`;
+            }
+            report += `\n`;
+
+            report += `## 7. 用户补充信息\n`;
+            report += `${userContext || '用户未提供额外上下文信息。'}\n`;
+
+            return report;
+        }
 
         // --- Initialization and Event Listeners ---
         document.addEventListener('DOMContentLoaded', (event) => {
@@ -776,7 +923,70 @@
                            displayError("错误: 无法加载或解析所需数据 - " + error.message + "。请确保从首页正确导航。");
                            return;
                      }
+                     const generateReportBtnXR = document.getElementById('generate-report-xr');
+            const reportOutputContainerXR = document.getElementById('report-output-xr-container');
+            const reportOutputTextareaXR = document.getElementById('report-output-xr');
+            const userContextTextareaXR = document.getElementById('user-context-xr');
+            const copyReportBtnXR = document.getElementById('copy-report-xr');
 
+            if (generateReportBtnXR) {
+                generateReportBtnXR.addEventListener('click', function() {
+                    if (typeof window.currentXbarBar_xr === 'undefined') { 
+                        alert("请先等待分析结果加载完成。");
+                        return;
+                    }
+                    const userContext = userContextTextareaXR.value.trim();
+                    const results = {
+                        n: window.currentN_xr, 
+                        k: window.currentK_xr,
+                        xbarBar: window.currentXbarBar_xr,
+                        rBar: window.currentRBar_xr,
+                        sigmaRbar: window.currentSigmaRbar_xr,
+                        sigmaS: window.currentSigmaS_xr,
+                        overallStdDevS: window.currentOverallStdDevS_xr,
+                        USL: USL, 
+                        LSL: LSL,
+                        xUCL: window.currentXUCL_xr, 
+                        xCL: window.currentXCL_xr, 
+                        xLCL: window.currentXLCL_xr,
+                        xUCL2Sigma: window.currentXUCL2Sigma_xr, 
+                        xLCL2Sigma: window.currentXLCL2Sigma_xr,
+                        xUCL1Sigma: window.currentXUCL1Sigma_xr, 
+                        xLCL1Sigma: window.currentXLCL1Sigma_xr,
+                        rUCL: window.currentRUCL_xr, 
+                        rCL: window.currentRCL_xr, 
+                        rLCL: window.currentRLCL_xr,
+                        skewness: skewness(allDataPoints), 
+                        kurtosis: kurtosis(allDataPoints),
+                        normalityConclusionText: document.getElementById('normality-conclusion') ? document.getElementById('normality-conclusion').innerHTML : "N/A",
+                        stabilityMessage: document.getElementById('stability-analysis') ? document.getElementById('stability-analysis').innerHTML : "N/A",
+                        xViolations: window.currentXRViolations || {},
+                        ruleDescriptions: window.currentXRRuleDescriptions || {},
+                        xbarValues: xbarValues,
+                        rPointsOutOfControlIndices: window.currentRViolationsIndices || [],
+                        rValues: rValues,
+                        Cp_Rbar: window.currentCp_Rbar_xr, 
+                        Cpk_Rbar: window.currentCpk_Rbar_xr,
+                        CpU_Rbar: window.currentCpU_Rbar_xr, 
+                        CpL_Rbar: window.currentCpL_Rbar_xr,
+                        Cp_S: window.currentCp_S_xr, 
+                        Cpk_S: window.currentCpk_S_xr,
+                        CpU_S: window.currentCpU_S_xr, 
+                        CpL_S: window.currentCpL_S_xr,
+                        Pp: window.currentPp_xr, 
+                        Ppk: window.currentPpk_xr,
+                        PpU: window.currentPpU_xr, 
+                        PpL: window.currentPpL_xr,
+                        interpretationTextShort: document.getElementById('interpretation') ? document.getElementById('interpretation').textContent.split('。')[0] + '。' : "N/A"
+                    };
+                    const reportText = generateXRReportText(results, userContext);
+                    reportOutputTextareaXR.value = reportText;
+                    reportOutputContainerXR.style.display = 'block';
+                });
+            }
+             if (copyReportBtnXR) { /* ... (复制逻辑同 I-MR) ... */
+                copyReportBtnXR.addEventListener('click', function() { reportOutputTextareaXR.select(); try { document.execCommand('copy'); alert('报告已复制到剪贴板！'); } catch (err) { navigator.clipboard.writeText(reportOutputTextareaXR.value).then(function() { alert('报告已复制到剪贴板！'); }, function(err) { alert('复制失败，请手动复制。'); console.error('Clipboard API copy failed: ', err); }); } });
+            }
                      // --- Resize Logic (No Tabs) ---
                     window.addEventListener('resize', () => {
                          if (window.currentCharts?.xbar) window.currentCharts.xbar.resize();
